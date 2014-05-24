@@ -10,11 +10,11 @@ Here are some of its properties you're likely to know from existing languages:
 * Concurrency is achieved through fibers.
 * It compiles to bytecode at runtime. This bytecode is (to some small degree) self-optimizing.
 
-\
+
 
 Of course there's more to Burn than that. Here are some of the twists that really set Burn apart:
 
-\
+
 
 **Typing**
 
@@ -32,7 +32,7 @@ let $HttpUrl = String.starting_with( "http://" )
 let $CustomType = function( $value ) { return <boolean expression> }
 ```
 
-\
+
 
 **Object capabilities**
 
