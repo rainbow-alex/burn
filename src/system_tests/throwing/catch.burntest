@@ -1,0 +1,19 @@
+try {
+	3 + "3"
+} catch $e {
+	print "caught?"
+}
+
+print "caught!"
+
+try {
+	3 + "3"
+} catch ArgumentError $e {
+	print "no"
+} catch TypeError $e {
+	print "yes"
+}
+---
+caught?
+caught!
+yes

@@ -1,0 +1,7 @@
+if false {
+	print "a"
+} else {
+	print "b"
+}
+---
+b

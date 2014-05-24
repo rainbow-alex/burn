@@ -1,0 +1,6 @@
+let $Real = Integer | Float
+print 0 is $Real
+print 0.0 is $Real
+---
+true
+true

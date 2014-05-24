@@ -1,0 +1,13 @@
+print 3 + 3
+print 3 + 3 is Integer
+print 3.3 + 3.3
+print 3 + 3.3
+print 3.3 + 3
+print 3.1 + 1.9 is Float
+---
+6
+true
+6.6
+6.3
+6.3
+true

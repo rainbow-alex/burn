@@ -1,0 +1,14 @@
+try {
+	try {
+		3 + "3"
+	} finally {
+		print "foo"
+	}
+} finally {
+	print "bar"
+}
+---
+foo
+bar
+Uncaught throwable:
+TypeError: Can't add <Integer> and <String>

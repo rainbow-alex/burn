@@ -1,0 +1,29 @@
+print true is Boolean
+print 3 is Integer
+print 3.2 is Float
+print 3 is Number
+print 3.2 is Number
+print "foo" is String
+print Integer is Type
+print Type is Type
+
+print ""
+
+try {
+	3 + "3"
+} catch $e {
+	print $e is Throwable
+	print $e is TypeError
+}
+---
+true
+true
+true
+true
+true
+true
+true
+true
+
+true
+true

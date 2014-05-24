@@ -1,0 +1,13 @@
+print 0
+print 3
+print 123
+print 0 is Integer
+print 3 is Integer
+print 123 is Integer
+---
+0
+3
+123
+true
+true
+true

@@ -1,0 +1,8 @@
+let $foo = function() {
+	print "foo"
+}
+$foo()
+$foo()
+---
+foo
+foo

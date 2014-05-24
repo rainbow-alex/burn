@@ -1,0 +1,7 @@
+let $foo = 5
+print $foo
+$foo = 6
+print $foo
+---
+5
+6

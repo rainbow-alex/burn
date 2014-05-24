@@ -1,0 +1,8 @@
+if true {
+	print "foo"
+}
+if false {
+	print "bar"
+}
+---
+foo

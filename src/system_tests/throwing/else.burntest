@@ -1,0 +1,34 @@
+try {
+	print "foo"
+} else {
+	print "bar"
+} finally {
+	print "baz"
+}
+
+try {
+	print "ok"
+} catch $e {
+	print "no"
+} else {
+	print "ok"
+}
+
+try {
+	print "foo"
+	3 + "3"
+} else {
+	print "bar"
+} finally {
+	print "baz"
+}
+---
+foo
+bar
+baz
+ok
+ok
+foo
+baz
+Uncaught throwable:
+TypeError: Can't add <Integer> and <String>

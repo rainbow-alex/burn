@@ -1,0 +1,9 @@
+if false {
+	print "a"
+} else if true {
+	print "b"
+} else {
+	print "c"
+}
+---
+b

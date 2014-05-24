@@ -1,0 +1,3 @@
+(c) 2014 Alex Deleyn <alex.deleyn@gmail.com>
+
+No open-source license is available at this time.

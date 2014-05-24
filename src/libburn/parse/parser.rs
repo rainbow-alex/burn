@@ -1,0 +1,814 @@
+use std::vec::Vec;
+use error::ParseError;
+use parse::token;
+use parse::lexer::Lexer;
+use parse::node;
+use parse::literal;
+use compile::analysis::{FrameAnalysis, ClosureAnalysis, ScopeAnalysis, VariableAnalysis};
+use mem::raw::Raw;
+use lang::identifier::Identifier;
+
+type ParseResult<T> = Result<T,ParseError>;
+
+pub struct Parser {
+	bogus: bool, // see https://github.com/mozilla/rust/issues/12660
+}
+
+	impl Parser {
+		
+		pub fn new() -> Parser {
+			Parser {
+				bogus: false,
+			}
+		}
+		
+		pub fn parse_script<'src>( &self, source: &'src str ) -> Result<Box<node::Script>,ParseError> {
+			
+			let mut parsing = Parsing {
+				lexer: Lexer::new( source ),
+				buffer: Vec::new(),
+				newline_policy: HeedNewlines,
+			};
+			
+			match parsing.parse_root() {
+				Ok( root ) => Ok( box node::Script { root: root } ),
+				Err( e ) => Err( e ),
+			}
+		}
+		
+		pub fn parse_repl( &self, source: &str ) -> Result<Box<node::Repl>,ParseError>{
+			
+			let mut parsing = Parsing {
+				lexer: Lexer::new( source ),
+				buffer: Vec::new(),
+				newline_policy: HeedNewlines,
+			};
+			
+			match parsing.parse_root() {
+				Ok( root ) => Ok( box node::Repl { root: root } ),
+				Err( e ) => Err( e ),
+			}
+		}
+	}
+
+struct Parsing<'src> {
+	lexer: Lexer<'src>,
+	buffer: Vec<token::Token<'src>>,
+	newline_policy: NewlinePolicy,
+}
+
+	#[deriving(Eq)]
+	enum NewlinePolicy {
+		IgnoreNewlines,
+		HeedNewlines,
+	}
+
+	macro_rules! unwrap_or_return_err(
+		($expr:expr) => {
+			match $expr {
+				Ok( v ) => v,
+				Err( e ) => { return Err( e ); }
+			}
+		}
+	)
+
+	macro_rules! return_err(
+		($expr:expr) => {
+			match $expr {
+				Ok(..) => {},
+				Err( e ) => { return Err( e ); }
+			}
+		}
+	)
+	
+	type Precedence = u8;
+	static PRECEDENCE_MULTIPLICATIVE: Precedence = 31;
+	static PRECEDENCE_ADDITIVE: Precedence = 30;
+	static PRECEDENCE_UNION: Precedence = 25;
+	static PRECEDENCE_COMPARE: Precedence = 20;
+	static PRECEDENCE_NOT: Precedence = 11;
+	static PRECEDENCE_BIN_LOGIC: Precedence = 10;
+	static PRECEDENCE_ANY: Precedence = 0;
+	
+	impl<'src> Parsing<'src> {
+		
+		//
+		// helpers
+		//
+		
+		fn fill_buffer( &mut self, length: uint ) {
+			while self.buffer.len() < length {
+				self.buffer.push( self.lexer.read() );
+			}
+		}
+		
+		fn peek_n( &mut self, mut offset: uint ) -> token::Token<'src> {
+			
+			if self.newline_policy == HeedNewlines {
+				
+				self.fill_buffer( offset + 1 );
+				return *self.buffer.get( offset )
+				
+			} else {
+				
+				let mut i = 0;
+				loop {
+					self.fill_buffer( i + 1 );
+					if *self.buffer.get( i ) != token::Newline {
+						if offset > 0 {
+							offset -= 1;
+						} else {
+							return *self.buffer.get( i );
+						}
+					}
+					i += 1;
+				}
+			}
+		}
+		
+		fn peek( &mut self ) -> token::Token<'src> {
+			self.peek_n( 0 )
+		}
+		
+		fn read( &mut self ) -> token::Token<'src> {
+			if self.newline_policy == IgnoreNewlines {
+				loop {
+					self.fill_buffer(1);
+					if *self.buffer.get(0) == token::Newline {
+						self.buffer.shift().unwrap();
+					} else {
+						break;
+					}
+				}
+			}
+			self.fill_buffer(1);
+			self.buffer.shift().unwrap()
+		}
+		
+		fn err( &self, message: StrBuf ) -> ParseError {
+			ParseError {
+				source_offset: self.lexer.offset,
+				message: message,
+			}
+		}
+		
+		fn skip_newlines( &mut self ) {
+			while self.peek() == token::Newline {
+				self.read();
+			}
+		}
+		
+		//
+		// Parsing logic
+		//
+		
+		fn parse_root( &mut self ) -> ParseResult<node::Root> {
+			
+			let mut statements = Vec::<Box<node::Statement>>::new();
+			
+			self.skip_newlines();
+			
+			loop {
+				if self.peek() == token::Eof {
+					break;
+				}
+				
+				let statement = unwrap_or_return_err!( self.parse_statement() );
+				statements.push( statement );
+				
+				match self.peek() {
+					token::Newline => self.skip_newlines(),
+					token::Eof => break,
+					_ => return Err( self.err( "Expected newline.".into_owned() ) )
+				}
+			}
+			
+			Ok( node::Root {
+				statements: statements,
+				frame: FrameAnalysis::new(),
+				scope: ScopeAnalysis::new(),
+			} )
+		}
+		
+		fn parse_block( &mut self ) -> ParseResult<Vec<Box<node::Statement>>> {
+			
+			let mut statements = Vec::<Box<node::Statement>>::new();
+			
+			match self.peek() {
+				token::LeftCurlyBracket => { self.read(); }
+				_ => return Err( self.err( "Expected `{`." .into_owned() ) )
+			}
+			
+			let old_newline_policy = self.newline_policy;
+			self.newline_policy = HeedNewlines;
+			self.skip_newlines();
+			
+			loop {
+				if self.peek() == token::RightCurlyBracket {
+					break;
+				}
+				
+				let statement = unwrap_or_return_err!( self.parse_statement() );
+				statements.push( statement );
+				
+				match self.peek() {
+					token::Newline => self.skip_newlines(),
+					token::RightCurlyBracket => break,
+					_ => return Err( self.err( "Expected newline.".to_owned() ) )
+				}
+			}
+			
+			let closing = self.read();
+			assert!( closing == token::RightCurlyBracket );
+			
+			self.newline_policy = old_newline_policy;
+			
+			Ok( statements )
+		}
+		
+		fn parse_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
+			match self.peek() {
+				
+				token::If => self.parse_if_statement(),
+				token::Try => self.parse_try_statement(),
+				
+				token::Let => self.parse_let_statement(),
+				token::Print => self.parse_print_statement(),
+				token::Throw => self.parse_throw_statement(),
+				
+				_ => {
+					
+					let expression = unwrap_or_return_err!( self.parse_expression() );
+					
+					if self.peek() == token::Equals {
+						
+						let lvalue = unwrap_or_return_err!( self.to_lvalue( expression ) );
+						self.read();
+						let rvalue = unwrap_or_return_err!( self.parse_expression() );
+						
+						Ok( box node::Assignment {
+							lvalue: lvalue,
+							rvalue: rvalue,
+						} )
+						
+					} else {
+						
+						Ok( box node::ExpressionStatement {
+							expression: expression,
+						} )
+					}
+				}
+			}
+		}
+		
+		fn parse_if_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
+			
+			let keyword = self.read();
+			assert!( keyword == token::If );
+			
+			let previous_newline_policy = self.newline_policy;
+			self.newline_policy = IgnoreNewlines;
+			
+			let if_test = unwrap_or_return_err!( self.parse_expression() );
+			let if_block = unwrap_or_return_err!( self.parse_block() );
+			
+			let mut else_if_clauses = Vec::new();
+			let mut else_clause = None;
+			
+			while self.peek() == token::Else {
+				
+				self.read();
+				
+				if self.peek() == token::If {
+					
+					self.read();
+					
+					let else_if_test = unwrap_or_return_err!( self.parse_expression() );
+					let else_if_block = unwrap_or_return_err!( self.parse_block() );
+					else_if_clauses.push( box node::ElseIf {
+						test: else_if_test,
+						scope: ScopeAnalysis::new(),
+						block: else_if_block,
+					} );
+					
+				} else {
+					
+					let else_block = unwrap_or_return_err!( self.parse_block() );
+					else_clause = Some( box node::Else {
+						scope: ScopeAnalysis::new(),
+						block: else_block,
+					} );
+					
+					break;
+				}
+			}
+			
+			self.newline_policy = previous_newline_policy;
+			
+			Ok( box node::If {
+				test: if_test,
+				scope: ScopeAnalysis::new(),
+				block: if_block,
+				else_if_clauses: else_if_clauses,
+				else_clause: else_clause,
+			} )
+		}
+		
+		fn parse_try_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
+			
+			let keyword = self.read();
+			assert!( keyword == token::Try );
+			
+			let previous_newline_policy = self.newline_policy;
+			self.newline_policy = IgnoreNewlines;
+			
+			let try_block = unwrap_or_return_err!( self.parse_block() );
+			
+			let mut catch_clauses = Vec::<Box<node::Catch>>::new();
+			
+			while self.peek() == token::Catch {
+				
+				self.read();
+				
+				let type_ = match self.peek() {
+					token::Variable(..) => match self.peek_n(1) {
+						token::LeftCurlyBracket => None,
+						_ => Some( unwrap_or_return_err!( self.parse_expression() ) ),
+					},
+					_ => Some( unwrap_or_return_err!( self.parse_expression() ) ),
+				};
+				
+				let variable_name = match self.peek() {
+					token::Variable( name ) => {
+						self.read();
+						Identifier::find_or_create( name )
+					}
+					_ => return Err( self.err( "Expected variable".to_owned() ) )
+				};
+				
+				let block = unwrap_or_return_err!( self.parse_block() );
+				
+				catch_clauses.push( box node::Catch {
+					type_: type_,
+					scope: ScopeAnalysis::new(),
+					variable: VariableAnalysis::new( variable_name ),
+					block: block,
+				} );
+			}
+			
+			let mut else_clause = None;
+			
+			if self.peek() == token::Else {
+				
+				self.read();
+				
+				let else_block = unwrap_or_return_err!( self.parse_block() );
+				else_clause = Some( box node::Else {
+					scope: ScopeAnalysis::new(),
+					block: else_block,
+				} );
+			}
+			
+			let mut finally_clause = None;
+			
+			if self.peek() == token::Finally {
+				
+				self.read();
+				
+				let finally_block = unwrap_or_return_err!( self.parse_block() );
+				finally_clause = Some( box node::Finally {
+					scope: ScopeAnalysis::new(),
+					block: finally_block,
+				} );
+			}
+			
+			self.newline_policy = previous_newline_policy;
+			
+			Ok( box node::Try {
+				scope: ScopeAnalysis::new(),
+				block: try_block,
+				catch_clauses: catch_clauses,
+				else_clause: else_clause,
+				finally_clause: finally_clause,
+			} )
+		}
+		
+		fn parse_let_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
+			
+			let source_offset = self.lexer.offset;
+			
+			let keyword = self.read();
+			assert!( keyword == token::Let );
+			
+			let variable_name = match self.peek() {
+				token::Variable( name ) => {
+					self.read();
+					Identifier::find_or_create( name )
+				}
+				_ => return Err( self.err( "Expected variable".to_owned() ) )
+			};
+			
+			let default = if self.peek() == token::Equals {
+				self.read();
+				Some( unwrap_or_return_err!( self.parse_expression() ) )
+			} else {
+				None
+			};
+			
+			Ok( box node::Let {
+				variable: VariableAnalysis::new( variable_name ),
+				default: default,
+				source_offset: source_offset,
+			} )
+		}
+		
+		fn parse_print_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
+			
+			let keyword = self.read();
+			assert!( keyword == token::Print );
+			
+			let expression = unwrap_or_return_err!( self.parse_expression() );
+			
+			Ok( box node::Print {
+				expression: expression,
+			} )
+		}
+		
+		fn parse_throw_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
+			
+			let keyword = self.read();
+			assert!( keyword == token::Throw );
+			
+			let expression = unwrap_or_return_err!( self.parse_expression() );
+			
+			Ok( box node::Throw {
+				expression: expression,
+			} )
+		}
+		
+		fn parse_expression( &mut self ) -> ParseResult<Box<node::Expression>> {
+			self.parse_op_expression( PRECEDENCE_ANY )
+		}
+		
+		/// Parse binary and unary expressions.
+		///
+		/// The algorithm used is called "precedence climbing".
+		/// Basically you keep greedily matching lower precedence operators. For every operator found,
+		/// the right-hand side subexpression is parsed by recursing (with a limit on how low the precedence can then go).
+		/// See http://en.wikipedia.org/wiki/Operator-precedence_parser
+		/// Note that in this implementation the outer loop has been unrolled.
+		fn parse_op_expression( &mut self, min_precedence: Precedence ) -> ParseResult<Box<node::Expression>> {
+			
+			//
+			// Unary
+			//
+			
+			if min_precedence <= PRECEDENCE_NOT && self.peek() == token::Not {
+				self.read();
+				let expression = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_NOT + 1 ) );
+				return Ok( box node::Not { expression: expression } );
+			}
+			
+			//
+			// Binary
+			//
+			
+			let mut left = unwrap_or_return_err!( self.parse_access_expression() );
+			
+			if min_precedence > PRECEDENCE_MULTIPLICATIVE {
+				return Ok( left );
+			}
+			
+			loop {
+				if self.peek() == token::Asterisk {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_MULTIPLICATIVE + 1 ) );
+					left = box node::Multiplication { left: left, right: right };
+				} else if self.peek() == token::Slash {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_MULTIPLICATIVE + 1 ) );
+					left = box node::Division { left: left, right: right };
+				} else {
+					break;
+				}
+			}
+			
+			if min_precedence > PRECEDENCE_ADDITIVE {
+				return Ok( left );
+			}
+			
+			loop {
+				if self.peek() == token::Plus {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_ADDITIVE + 1 ) );
+					left = box node::Addition { left: left, right: right };
+				} else if self.peek() == token::Dash {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_ADDITIVE + 1 ) );
+					left = box node::Subtraction { left: left, right: right };
+				} else {
+					break;
+				}
+			}
+			
+			if min_precedence > PRECEDENCE_UNION {
+				return Ok( left );
+			}
+			
+			while self.peek() == token::VerticalBar {
+				self.read();
+				self.skip_newlines();
+				let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_UNION + 1 ) );
+				left = box node::Union { left: left, right: right };
+			}
+			
+			if min_precedence > PRECEDENCE_COMPARE {
+				return Ok( left );
+			}
+			
+			match self.peek() {
+				
+				token::Is => {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_COMPARE + 1 ) );
+					left = box node::Is { left: left, right: right };
+				}
+				
+				_ => {}
+			}
+			
+			if min_precedence > PRECEDENCE_BIN_LOGIC {
+				return Ok( left );
+			}
+			
+			if self.peek() == token::And {
+				while self.peek() == token::And {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_BIN_LOGIC + 1 ) );
+					left = box node::And { left: left, right: right };
+				}
+			} else {
+				while self.peek() == token::Or {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_BIN_LOGIC + 1 ) );
+					left = box node::Or { left: left, right: right };
+				}
+			}
+			
+			Ok( left )
+		}
+		
+		fn parse_access_expression( &mut self ) -> ParseResult<Box<node::Expression>> {
+			
+			let mut expression = unwrap_or_return_err!( self.parse_atom_expression() );
+			
+			loop {
+				match self.peek() {
+					
+					token::LeftParenthesis => {
+						self.read();
+						self.read(); //TODO!
+						expression = box node::Call {
+							expression: expression,
+							arguments: Vec::new(),
+						};
+					}
+					
+					_ => break
+				}
+			}
+			
+			Ok( expression )
+		}
+		
+		fn parse_atom_expression( &mut self ) -> ParseResult<Box<node::Expression>> {
+			
+			match self.peek() {
+				
+				token::Function => self.parse_function(),
+				
+				token::LeftParenthesis => {
+					
+					let left = self.read();
+					assert!( left == token::LeftParenthesis );
+					
+					let old_newline_policy = self.newline_policy;
+					self.newline_policy = IgnoreNewlines;
+					
+					let expr = unwrap_or_return_err!( self.parse_expression() );
+					
+					if self.peek() != token::RightParenthesis {
+						return Err( self.err( format!( "Expected {}.", token::RightParenthesis ) ) );
+					}
+					self.read(); // )
+					
+					self.newline_policy = old_newline_policy;
+					
+					Ok( expr )
+				}
+				
+				token::Identifier( identifier ) => {
+					self.read();
+					Ok( box node::Name { identifier: Identifier::find_or_create( identifier ) } )
+				}
+				token::Variable( name ) => {
+					let source_offset = self.lexer.offset;
+					self.read();
+					Ok( box node::Variable {
+						name: Identifier::find_or_create( name ),
+						source_offset: source_offset,
+						analysis: Raw::null(),
+					} )
+				}
+				
+				token::String( source ) => {
+					self.read();
+					match literal::parse_string( source ) {
+						Ok( value ) => Ok( box node::String { value: value } ),
+						Err( (message, _) ) => Err( self.err( message ) ),
+					}
+				}
+				token::Integer( source ) => {
+					self.read();
+					match literal::parse_int( source ) {
+						Ok( value ) => Ok( box node::Integer { value: value } ),
+						Err( e ) => Err( self.err( e ) ),
+					}
+				}
+				token::Float( source ) => {
+					self.read();
+					match literal::parse_float( source ) {
+						Ok( value ) => Ok( box node::Float { value: value } ),
+						Err( e ) => Err( self.err( e ) ),
+					}
+				}
+				token::True => {
+					self.read();
+					Ok( box node::Boolean { value: true } )
+				}
+				token::False => {
+					self.read();
+					Ok( box node::Boolean { value: false } )
+				}
+				token::Nothing => {
+					self.read();
+					Ok( box node::Nothing )
+				}
+				
+				t @ _ => {
+					Err( self.err( format!( "Unexpected {}.", t ) ) )
+				}
+			}
+		}
+		
+		fn parse_function( &mut self ) -> ParseResult<Box<node::Expression>> {
+			
+			let keyword = self.read();
+			assert!( keyword == token::Function );
+			
+			let previous_newline_policy = self.newline_policy;
+			self.newline_policy = IgnoreNewlines;
+			
+			if self.peek() != token::LeftParenthesis {
+				return Err( self.err( "Expected `(`".to_owned() ) );
+			}
+			self.read();
+			
+			let parameters = unwrap_or_return_err!( self.parse_function_parameters() );
+			
+			if self.peek() != token::RightParenthesis {
+				return Err( self.err( "Expected `)`".to_owned() ) );
+			}
+			self.read();
+			
+			let block = unwrap_or_return_err!( self.parse_block() );
+			
+			self.newline_policy = previous_newline_policy;
+			
+			Ok( box node::Function {
+				parameters: parameters,
+				block: block,
+				closure: ClosureAnalysis::new(),
+				scope: ScopeAnalysis::new(),
+			} )
+		}
+		
+		fn parse_function_parameters( &mut self ) -> ParseResult<Vec<node::FunctionParameter>> {
+			
+			let mut parameters = Vec::new();
+			
+			if self.peek() == token::RightParenthesis {
+				return Ok( parameters );
+			}
+			
+			loop {
+				let type_ = match self.peek() {
+					token::Variable(..) => match self.peek_n(1) {
+						token::Equals | token::Comma => None,
+						_ => Some( unwrap_or_return_err!( self.parse_expression() ) ),
+					},
+					_ => Some( unwrap_or_return_err!( self.parse_expression() ) ),
+				};
+				
+				let variable_name = match self.peek() {
+					token::Variable( name ) => {
+						self.read();
+						Identifier::find_or_create( name )
+					}
+					_ => return Err( self.err( "Expected variable".to_owned() ) )
+				};
+				
+				let default = if self.peek() == token::Equals {
+					self.read();
+					Some( unwrap_or_return_err!( self.parse_expression() ) )
+				} else {
+					None
+				};
+				
+				parameters.push( node::FunctionParameter {
+					type_: type_,
+					default: default,
+					variable: VariableAnalysis::new( variable_name ),
+				} );
+				
+				match self.peek() {
+					token::Comma => {
+						self.read();
+					}
+					token::RightParenthesis => break,
+					_ => return Err( self.err( "Expected `)` or `,`".to_owned() ) )
+				};
+			}
+			
+			Ok( parameters )
+		}
+		
+		fn to_lvalue( &self, expression: Box<node::Expression> ) -> ParseResult<Box<node::Lvalue>> {
+			match *expression {
+				
+				node::Variable {
+					name: name,
+					analysis: analysis,
+					source_offset: _,
+				} => {
+					Ok( box node::VariableLvalue {
+						name: name,
+						analysis: analysis,
+					} )
+				}
+				
+				_ => Err( self.err( "Invalid lvalue".to_owned() ) )
+			}
+		}
+	}
+
+#[cfg(test)]
+mod test {
+	
+	use parse::parser::Parser;
+	
+	fn parse( source: &str ) -> StrBuf {
+		let parser = Parser::new();
+		let formatted = match parser.parse_script( source ) {
+			Ok( ast ) => format!( "{}", ast ),
+			Err( e ) => format!( "{}", e.message ),
+		};
+		println!( "{}", formatted );
+		formatted
+	}
+	
+	#[test]
+	fn test_edge_cases() {
+		assert!( parse( "" ) == "[]".to_owned() );
+	}
+	
+	#[test]
+	fn test_newlines() {
+		assert!( parse( "1\n2" ) == parse( "\n1\n2" ) );
+		assert!( parse( "1\n2" ) == parse( "1\n2\n" ) );
+		assert!( parse( "1\n2" ) == parse( "\n\n1\n\n2\n\n" ) );
+		
+		assert!( parse( "1+2" ) == parse( "1+\n2" ) );
+		assert!( parse( "1\n+2" ) == "Unexpected `+`.".to_owned() );
+		assert!( parse( "1+2" ) == parse( "(\n1\n+\n2\n)" ) );
+		
+		assert!( parse( "function(){}" ) == parse( "function\n(\n)\n{\n}" ) );
+		assert!( parse( "function(){}+2" ) != parse( "function(){}\n+2" ) );
+	}
+	
+	#[test]
+	fn test_precedence() {
+		assert!( parse( "1+2" ) == "[(1+2)]".to_owned() );
+		assert!( parse( "1+2+3" ) == "[((1+2)+3)]".to_owned() );
+		assert!( parse( "1*2" ) == "[(1*2)]".to_owned() );
+		assert!( parse( "1+2*3" ) == "[(1+(2*3))]".to_owned() );
+		assert!( parse( "(1+2)*3" ) == "[((1+2)*3)]".to_owned() );
+	}
+}
