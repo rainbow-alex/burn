@@ -1,0 +1,9 @@
+try {
+	//
+} finally {
+	3 + "3"
+}
+print "foo"
+---
+Uncaught throwable:
+TypeError: Can't add <Integer> and <String>

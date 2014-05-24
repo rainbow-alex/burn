@@ -1,0 +1,10 @@
+try {
+	3 + "3"
+} catch "not-a-type" $e {
+} finally {
+	print "finally"
+}
+---
+finally
+Uncaught throwable:
+TypeError: <String> is not a type

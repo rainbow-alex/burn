@@ -483,7 +483,7 @@ pub struct ResolveVariablesAndSetTimes {
 						
 						if binding.variable.get() == variable {
 						
-							if mutable {
+							if ! mutable {
 								return;
 							} else {
 								binding.mutable = true;
@@ -505,9 +505,7 @@ pub struct ResolveVariablesAndSetTimes {
 				
 				for binding in variable.root_binds.mut_iter() {
 					if binding.time == time {
-						if ! binding.mutable {
-							binding.mutable = mutable;
-						}
+						binding.mutable = binding.mutable || mutable;
 						return;
 					}
 				}

@@ -1,0 +1,13 @@
+try {
+	3 + "3"
+} finally {
+	try {
+		3 + "3"
+	} catch TypeError $e {
+		print "caught"
+	}
+}
+---
+caught
+Uncaught throwable:
+TypeError: Can't add <Integer> and <String>

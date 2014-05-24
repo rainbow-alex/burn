@@ -37,6 +37,8 @@ pub struct FunctionDefinition {
 	rc: RcHeader,
 	pub parameters: Vec<FunctionParameterDefinition>,
 	pub code: Code,
+	pub n_static_bound_variables: uint,
+	pub n_shared_bound_variables: uint,
 }
 
 	impl FunctionDefinition {
@@ -46,6 +48,8 @@ pub struct FunctionDefinition {
 				rc: RcHeader::new(),
 				parameters: parameters,
 				code: code,
+				n_static_bound_variables: 0,
+				n_shared_bound_variables: 0,
 			}
 		}
 	}
