@@ -1,5 +1,5 @@
 use std::vec::Vec;
-use compile::analysis::{FrameAnalysis, ClosureAnalysis, ScopeAnalysis, VariableAnalysis};
+use compile::analysis::{FrameAnalysis, VariableAnalysis};
 use mem::raw::Raw;
 use lang::identifier::Identifier;
 
@@ -14,7 +14,6 @@ pub struct Repl {
 pub struct Root {
 	pub statements: Vec<Box<Statement>>,
 	pub frame: FrameAnalysis,
-	pub scope: ScopeAnalysis,
 }
 
 // STATEMENTS //////////////////////////////////////////////////////////////////////////////////////
@@ -23,14 +22,12 @@ pub enum Statement {
 	
 	If {
 		pub test: Box<Expression>,
-		pub scope: ScopeAnalysis,
 		pub block: Vec<Box<Statement>>,
 		pub else_if_clauses: Vec<Box<ElseIf>>,
 		pub else_clause: Option<Box<Else>>,
 	},
 	
 	Try {
-		pub scope: ScopeAnalysis,
 		pub block: Vec<Box<Statement>>,
 		pub catch_clauses: Vec<Box<Catch>>,
 		pub else_clause: Option<Box<Else>>,
@@ -39,13 +36,13 @@ pub enum Statement {
 	
 	While {
 		pub test: Box<Expression>,
-		pub scope: ScopeAnalysis,
 		pub block: Vec<Box<Statement>>,
 		pub else_clause: Option<Box<Else>>,
 	},
 	
 	Let {
-		pub variable: VariableAnalysis,
+		pub variable_name: Identifier,
+		pub variable: Raw<VariableAnalysis>,
 		pub default: Option<Box<Expression>>,
 		pub source_offset: uint,
 	},
@@ -74,24 +71,21 @@ pub enum Statement {
 
 pub struct ElseIf {
 	pub test: Box<Expression>,
-	pub scope: ScopeAnalysis,
 	pub block: Vec<Box<Statement>>,
 }
 
 pub struct Else {
-	pub scope: ScopeAnalysis,
 	pub block: Vec<Box<Statement>>,
 }
 
 pub struct Catch {
 	pub type_: Option<Box<Expression>>,
-	pub scope: ScopeAnalysis,
-	pub variable: VariableAnalysis,
+	pub variable_name: Identifier,
+	pub variable: Raw<VariableAnalysis>,
 	pub block: Vec<Box<Statement>>,
 }
 
 pub struct Finally {
-	pub scope: ScopeAnalysis,
 	pub block: Vec<Box<Statement>>,
 }
 
@@ -101,8 +95,7 @@ pub enum Expression {
 	
 	Function {
 		pub parameters: Vec<FunctionParameter>,
-		pub closure: ClosureAnalysis,
-		pub scope: ScopeAnalysis,
+		pub frame: FrameAnalysis,
 		pub block: Vec<Box<Statement>>,
 	},
 	
@@ -185,7 +178,8 @@ pub enum Expression {
 pub struct FunctionParameter {
 	pub type_: Option<Box<Expression>>,
 	pub default: Option<Box<Expression>>,
-	pub variable: VariableAnalysis,
+	pub variable_name: Identifier,
+	pub variable: Raw<VariableAnalysis>,
 }
 
 // LVALUES /////////////////////////////////////////////////////////////////////////////////////////

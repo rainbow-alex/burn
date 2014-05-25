@@ -7,10 +7,8 @@ use mem::rc::Rc;
 use vm::code::Code;
 use vm::opcode;
 use compile::analysis;
-use compile::analysis::{VariableAnalysis, ClosureAnalysis};
-use compile::analysis::find_variable_declarations::FindVariableDeclarations;
-use compile::analysis::resolve_variables_and_set_times::ResolveVariablesAndSetTimes;
-use compile::analysis::determine_variable_lifetime_and_storage_type::DetermineVariableLifetimeAndStorageType;
+use compile::analysis::FrameAnalysis;
+use compile::analysis::analyze_variables::AnalyzeVariables;
 use compile::analysis::determine_allocation::DetermineAllocation;
 
 pub struct Compiler;
@@ -23,29 +21,17 @@ pub struct Compiler;
 		
 		pub fn compile_script( &mut self, script: &mut node::Script ) -> Result<Code,Vec<AnalysisError>> {
 			
+			if unsafe { ::DEBUG } { println!( "COMPILER: Analyzing variables..." ); }
+			
 			{
-				let mut pass = FindVariableDeclarations::new();
+				let mut pass = AnalyzeVariables::new();
 				pass.analyze_root( &mut script.root );
 				if pass.errors.len() > 0 {
 					return Err( pass.errors );
 				}
 			}
 			
-			{
-				let mut pass = ResolveVariablesAndSetTimes::new();
-				pass.analyze_root( &mut script.root );
-				if pass.errors.len() > 0 {
-					return Err( pass.errors );
-				}
-			}
-			
-			{
-				let mut pass = DetermineVariableLifetimeAndStorageType::new();
-				pass.analyze_root( &mut script.root );
-				if pass.errors.len() > 0 {
-					return Err( pass.errors );
-				}
-			}
+			if unsafe { ::DEBUG } { println!( "COMPILER: Determing allocation..." ); }
 			
 			{
 				let mut pass = DetermineAllocation::new();
@@ -54,6 +40,8 @@ pub struct Compiler;
 					return Err( pass.errors );
 				}
 			}
+			
+			if unsafe { ::DEBUG } { println!( "COMPILER: Compiling..." ); }
 			
 			let code = {
 				let mut compilation = Compilation::new();
@@ -61,59 +49,34 @@ pub struct Compiler;
 				compilation.code
 			};
 			
-			if unsafe { ::DEBUG_BYTECODE } {
-				code.dump();
-			}
+			if unsafe { ::DEBUG } { println!( "COMPILER: Done." ); code.dump(); }
 			
 			Ok( code )
 		}
 		
 		pub fn compile_repl( &mut self, repl: &mut node::Repl, repl_state: &mut ::vm::repl::ReplState ) -> Result<Code,Vec<AnalysisError>> {
 			
-			let mut repl_vars = Vec::<Box<VariableAnalysis>>::new();
-			
-			for &name in repl_state.variables.keys() {
-				let mut var = box VariableAnalysis::new( name );
-				var.declared_in = Raw::new( &repl.root.scope );
-				repl.root.scope.declared.push( Raw::new( var ) );
-				repl_vars.push( var );
-			}
+			if unsafe { ::DEBUG } { println!( "COMPILER: Analyzing variables..." ); }
 			
 			{
-				let mut pass = FindVariableDeclarations::new();
-				pass.analyze_root( &mut repl.root );
+				let mut pass = AnalyzeVariables::new();
+				pass.analyze_repl_root( &mut repl.root, repl_state );
 				if pass.errors.len() > 0 {
 					return Err( pass.errors );
 				}
 			}
 			
-			for var in repl.root.scope.declared.iter().skip( repl_vars.len() ) {
-				repl_state.declare_variable( var.get().name );
-			}
-			
-			{
-				let mut pass = ResolveVariablesAndSetTimes::new();
-				pass.analyze_root( &mut repl.root );
-				if pass.errors.len() > 0 {
-					return Err( pass.errors );
-				}
-			}
-			
-			{
-				let mut pass = DetermineVariableLifetimeAndStorageType::new();
-				pass.analyze_root( &mut repl.root );
-				if pass.errors.len() > 0 {
-					return Err( pass.errors );
-				}
-			}
+			if unsafe { ::DEBUG } { println!( "COMPILER: Determing allocation..." ); }
 			
 			{
 				let mut pass = DetermineAllocation::new();
-				pass.analyze_root( &mut repl.root );
+				pass.analyze_repl_root( &mut repl.root, repl_state );
 				if pass.errors.len() > 0 {
 					return Err( pass.errors );
 				}
 			}
+			
+			if unsafe { ::DEBUG } { println!( "COMPILER: Compiling..." ); }
 			
 			let code = {
 				let mut compilation = Compilation::new();
@@ -121,9 +84,7 @@ pub struct Compiler;
 				compilation.code
 			};
 			
-			if unsafe { ::DEBUG_BYTECODE } {
-				code.dump();
-			}
+			if unsafe { ::DEBUG } { println!( "COMPILER: Done." ); code.dump(); }
 			
 			Ok( code )
 		}
@@ -131,7 +92,7 @@ pub struct Compiler;
 
 struct Compilation {
 	code: Code,
-	closure: Raw<ClosureAnalysis>,
+	frames: Vec<Raw<FrameAnalysis>>,
 }
 
 	type Placeholder = uint;
@@ -141,7 +102,7 @@ struct Compilation {
 		fn new() -> Compilation {
 			Compilation {
 				code: Code::new(),
-				closure: Raw::null(),
+				frames: Vec::new(),
 			}
 		}
 		
@@ -157,6 +118,8 @@ struct Compilation {
 		
 		fn compile_root( &mut self, root: &node::Root ) {
 			
+			self.frames.push( Raw::new( &root.frame ) );
+			
 			self.code.n_local_variables = root.frame.n_local_variables;
 			self.code.n_shared_local_variables = root.frame.n_shared_local_variables;
 			
@@ -164,31 +127,25 @@ struct Compilation {
 				self.compile_statement( *statement );
 			}
 			self.code.opcodes.push( opcode::End );
+			
+			self.frames.pop();
 		}
 		
-		fn compile_function( &mut self, function: &node::Expression ) {
-			match *function {
-				
-				node::Function {
-					parameters: _,
-					closure: ref closure,
-					scope: _,
-					block: ref block,
-				} => {
-					
-					self.code.n_local_variables = closure.frame.n_local_variables;
-					self.code.n_shared_local_variables = closure.frame.n_shared_local_variables;
-					
-					for statement in block.iter() {
-						self.compile_statement( *statement );
-					}
-					
-					self.code.opcodes.push( opcode::PushNothing );
-					self.code.opcodes.push( opcode::Return );
-				}
-				
-				_ => fail!()
-			};
+		fn compile_function( &mut self, frame: &FrameAnalysis, block: &Vec<Box<node::Statement>> ) {
+			
+			self.frames.push( Raw::new( frame ) );
+			
+			self.code.n_local_variables = frame.n_local_variables;
+			self.code.n_shared_local_variables = frame.n_shared_local_variables;
+			
+			for statement in block.iter() {
+				self.compile_statement( *statement );
+			}
+			
+			self.code.opcodes.push( opcode::PushNothing );
+			self.code.opcodes.push( opcode::Return );
+			
+			self.frames.pop();
 		}
 		
 		fn compile_statement( &mut self, statement: &node::Statement ) {
@@ -229,9 +186,45 @@ struct Compilation {
 					}
 				}
 				
+				node::Let {
+					variable_name: _,
+					variable: ref variable,
+					default: ref default,
+					source_offset: _,
+				} => {
+					let variable = variable.get();
+					
+					if default.is_some() {
+						
+						self.compile_expression( *default.as_ref().unwrap() );
+						
+						match variable.local_storage_type {
+							analysis::LocalStorage => {
+								self.code.opcodes.push( opcode::StoreLocal { index: variable.local_storage_index } );
+							}
+							analysis::SharedLocalStorage => {
+								self.code.opcodes.push( opcode::StoreSharedLocal { index: variable.local_storage_index } );
+							}
+						};
+					}
+				}
+				
+				node::Print {
+					expression: ref expression,
+				} => {
+					self.compile_expression( *expression );
+					self.code.opcodes.push( opcode::Print );
+				}
+				
+				node::Throw {
+					expression: ref expression,
+				} => {
+					self.compile_expression( *expression );
+					self.code.opcodes.push( opcode::Throw );
+				}
+				
 				node::If {
 					test: ref test,
-					scope: _,
 					block: ref if_block,
 					else_if_clauses: ref else_if_clauses,
 					else_clause: ref else_clause,
@@ -289,8 +282,30 @@ struct Compilation {
 					}
 				}
 				
+				node::While {
+					test: ref while_test,
+					block: ref while_block,
+					else_clause: ref else_clause,
+				} => {
+					
+					let start = self.code.opcodes.len();
+					
+					self.compile_expression( *while_test );
+					let test_opcode = self.create_placeholder();
+					
+					for statement in while_block.iter() {
+						self.compile_statement( *statement );
+					}
+					
+					self.code.opcodes.push( opcode::Jump { instruction: start } );
+					
+					let jump = opcode::JumpIfPopFalsy { instruction: self.code.opcodes.len() };
+					self.fill_in_placeholder( test_opcode, jump );
+					
+					assert!( else_clause.is_none() ); // TODO
+				}
+				
 				node::Try {
-					scope: _,
 					block: ref try_block,
 					catch_clauses: ref catch_clauses,
 					else_clause: ref else_clause,
@@ -387,41 +402,6 @@ struct Compilation {
 					}
 				}
 				
-				node::Let {
-					variable: ref variable,
-					default: ref default,
-					source_offset: _,
-				} => {
-					
-					if default.is_some() {
-						
-						self.compile_expression( *default.as_ref().unwrap() );
-						
-						match variable.local_storage_type {
-							analysis::LocalStorage => {
-								self.code.opcodes.push( opcode::StoreLocal { index: variable.local_storage_index } );
-							}
-							analysis::SharedLocalStorage => {
-								self.code.opcodes.push( opcode::StoreSharedLocal { index: variable.local_storage_index } );
-							}
-						};
-					}
-				}
-				
-				node::Print {
-					expression: ref expression,
-				} => {
-					self.compile_expression( *expression );
-					self.code.opcodes.push( opcode::Print );
-				}
-				
-				node::Throw {
-					expression: ref expression,
-				} => {
-					self.compile_expression( *expression );
-					self.code.opcodes.push( opcode::Throw );
-				}
-				
 				_ => fail!(), // TODO
 			}
 		}
@@ -465,8 +445,9 @@ struct Compilation {
 				} => {
 					
 					let variable = variable.get();
+					let current_frame = self.frames.last().unwrap().get();
 					
-					if self.closure.is_null() || variable.declared_in.get().frame.get() == &mut self.closure.get().frame {
+					if current_frame.closure.is_none() || variable.declared_in.get() == current_frame {
 						
 						match variable.local_storage_type {
 							analysis::LocalStorage => {
@@ -479,7 +460,7 @@ struct Compilation {
 						
 					} else {
 						
-						for binding in self.closure.get().bound.iter() {
+						for binding in current_frame.get_closure().bindings.iter() {
 							if binding.variable.get() == variable {
 								
 								match variable.bound_storage_type {
@@ -554,11 +535,16 @@ struct Compilation {
 					self.code.opcodes.push( opcode::Is );
 				}
 				
-				node::Function {..} => {
+				node::Function {
+					parameters: _,
+					frame: ref frame,
+					block: ref block,
+				} => {
 					
 					let mut compilation = Compilation::new();
-					compilation.compile_function( expression );
+					compilation.compile_function( frame, block );
 					let code = compilation.code;
+					
 					let definition = Rc::new( FunctionDefinition::new( Vec::new(), code ) );
 					
 					self.code.opcodes.push( opcode::PushFunction { index: self.code.functions.len() } );

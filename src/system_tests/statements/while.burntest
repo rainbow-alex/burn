@@ -1,0 +1,9 @@
+let $i = 3
+while $i {
+	print "foo"
+	$i = $i - 1
+}
+---
+foo
+foo
+foo

@@ -1,0 +1,12 @@
+if true {
+	let $foo = 3
+	print $foo
+}
+if true {
+	let $foo
+	print $foo
+}
+/*
+---
+3
+nothing

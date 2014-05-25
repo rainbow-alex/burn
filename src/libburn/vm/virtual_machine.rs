@@ -78,9 +78,8 @@ pub struct VirtualMachine {
 			let locals = Vec::from_elem( code.n_local_variables, value::Nothing );
 			let mut shared = Vec::from_elem( code.n_shared_local_variables, value::SharedValue::new( value::Nothing ) );
 			
-			for var in ast.root.scope.declared.iter() {
-				let var = var.get();
-				*shared.get_mut( var.local_storage_index ) = repl_state.variables.get_copy( &var.name );
+			for variable in ast.root.frame.declared.iter().take( repl_state.variables.len() ) {
+				*shared.get_mut( variable.local_storage_index ) = repl_state.variables.find( &variable.name ).unwrap().clone();
 			}
 			
 			let script = box Script { code: code };
@@ -117,8 +116,8 @@ pub struct VirtualMachine {
 							
 							'instruction_loop: loop {
 								
-								if unsafe { ::DEBUG_BYTECODE } {
-									println!( "{}/{} {}", frame.instruction, opcodes.len(), flow_points.len() );
+								if unsafe { ::DEBUG } {
+									println!( "VM: running {}/{} ({})", frame.instruction, opcodes.len(), flow_points.len() );
 								}
 								
 								match opcodes[ frame.instruction ] {

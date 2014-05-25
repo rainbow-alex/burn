@@ -21,7 +21,7 @@ fn main() {
 	for arg in args {
 		match arg.as_slice() {
 			"-d" | "--debug" => {
-				unsafe { burn::DEBUG_BYTECODE = true; }
+				unsafe { burn::DEBUG = true; }
 			}
 			"-h" | "--help" => {
 				help();

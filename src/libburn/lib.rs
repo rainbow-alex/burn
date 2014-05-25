@@ -62,4 +62,4 @@ pub mod builtin {
 	pub mod intrinsic;
 }
 
-pub static mut DEBUG_BYTECODE: bool = false;
+pub static mut DEBUG: bool = false;

@@ -4,7 +4,7 @@ use parse::token;
 use parse::lexer::Lexer;
 use parse::node;
 use parse::literal;
-use compile::analysis::{FrameAnalysis, ClosureAnalysis, ScopeAnalysis, VariableAnalysis};
+use compile::analysis::FrameAnalysis;
 use mem::raw::Raw;
 use lang::identifier::Identifier;
 
@@ -186,7 +186,6 @@ struct Parsing<'src> {
 			Ok( node::Root {
 				statements: statements,
 				frame: FrameAnalysis::new(),
-				scope: ScopeAnalysis::new(),
 			} )
 		}
 		
@@ -229,12 +228,13 @@ struct Parsing<'src> {
 		fn parse_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
 			match self.peek() {
 				
-				token::If => self.parse_if_statement(),
-				token::Try => self.parse_try_statement(),
-				
 				token::Let => self.parse_let_statement(),
 				token::Print => self.parse_print_statement(),
 				token::Throw => self.parse_throw_statement(),
+				
+				token::If => self.parse_if_statement(),
+				token::While => self.parse_while_statement(),
+				token::Try => self.parse_try_statement(),
 				
 				_ => {
 					
@@ -287,7 +287,6 @@ struct Parsing<'src> {
 					let else_if_block = unwrap_or_return_err!( self.parse_block() );
 					else_if_clauses.push( box node::ElseIf {
 						test: else_if_test,
-						scope: ScopeAnalysis::new(),
 						block: else_if_block,
 					} );
 					
@@ -295,7 +294,6 @@ struct Parsing<'src> {
 					
 					let else_block = unwrap_or_return_err!( self.parse_block() );
 					else_clause = Some( box node::Else {
-						scope: ScopeAnalysis::new(),
 						block: else_block,
 					} );
 					
@@ -307,9 +305,38 @@ struct Parsing<'src> {
 			
 			Ok( box node::If {
 				test: if_test,
-				scope: ScopeAnalysis::new(),
 				block: if_block,
 				else_if_clauses: else_if_clauses,
+				else_clause: else_clause,
+			} )
+		}
+		
+		fn parse_while_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
+			
+			let keyword = self.read();
+			assert!( keyword == token::While );
+			
+			let previous_newline_policy = self.newline_policy;
+			self.newline_policy = IgnoreNewlines;
+			
+			let test = unwrap_or_return_err!( self.parse_expression() );
+			let while_block = unwrap_or_return_err!( self.parse_block() );
+			
+			let mut else_clause = None;
+			
+			if self.peek() == token::Else {
+				self.read();
+				let else_block = unwrap_or_return_err!( self.parse_block() );
+				else_clause = Some( box node::Else {
+					block: else_block,
+				} );
+			}
+			
+			self.newline_policy = previous_newline_policy;
+			
+			Ok( box node::While {
+				test: test,
+				block: while_block,
 				else_clause: else_clause,
 			} )
 		}
@@ -350,8 +377,8 @@ struct Parsing<'src> {
 				
 				catch_clauses.push( box node::Catch {
 					type_: type_,
-					scope: ScopeAnalysis::new(),
-					variable: VariableAnalysis::new( variable_name ),
+					variable_name: variable_name,
+					variable: Raw::null(),
 					block: block,
 				} );
 			}
@@ -364,7 +391,6 @@ struct Parsing<'src> {
 				
 				let else_block = unwrap_or_return_err!( self.parse_block() );
 				else_clause = Some( box node::Else {
-					scope: ScopeAnalysis::new(),
 					block: else_block,
 				} );
 			}
@@ -377,7 +403,6 @@ struct Parsing<'src> {
 				
 				let finally_block = unwrap_or_return_err!( self.parse_block() );
 				finally_clause = Some( box node::Finally {
-					scope: ScopeAnalysis::new(),
 					block: finally_block,
 				} );
 			}
@@ -385,7 +410,6 @@ struct Parsing<'src> {
 			self.newline_policy = previous_newline_policy;
 			
 			Ok( box node::Try {
-				scope: ScopeAnalysis::new(),
 				block: try_block,
 				catch_clauses: catch_clauses,
 				else_clause: else_clause,
@@ -416,7 +440,8 @@ struct Parsing<'src> {
 			};
 			
 			Ok( box node::Let {
-				variable: VariableAnalysis::new( variable_name ),
+				variable_name: variable_name,
+				variable: Raw::null(),
 				default: default,
 				source_offset: source_offset,
 			} )
@@ -695,8 +720,7 @@ struct Parsing<'src> {
 			Ok( box node::Function {
 				parameters: parameters,
 				block: block,
-				closure: ClosureAnalysis::new(),
-				scope: ScopeAnalysis::new(),
+				frame: FrameAnalysis::new_with_closure(),
 			} )
 		}
 		
@@ -735,7 +759,8 @@ struct Parsing<'src> {
 				parameters.push( node::FunctionParameter {
 					type_: type_,
 					default: default,
-					variable: VariableAnalysis::new( variable_name ),
+					variable_name: variable_name,
+					variable: Raw::null(),
 				} );
 				
 				match self.peek() {

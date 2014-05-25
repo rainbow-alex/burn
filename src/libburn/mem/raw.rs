@@ -7,6 +7,7 @@ pub struct Raw<T> {
 
 	impl<T> Raw<T> {
 		
+		#[inline(always)]
 		pub fn new( t: &T ) -> Raw<T> {
 			Raw { ptr: t as *T }
 		}
