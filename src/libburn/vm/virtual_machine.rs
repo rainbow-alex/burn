@@ -302,7 +302,7 @@ pub struct VirtualMachine {
 										data_stack.push(
 											value::Function(
 												self.functions.register(
-													box Function::new(
+													Function::new(
 														code.get().functions.get( i ).clone()
 													)
 												)

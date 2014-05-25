@@ -3,9 +3,6 @@ use compile::analysis::{FrameAnalysis, ClosureAnalysis, ScopeAnalysis, VariableA
 use mem::raw::Raw;
 use lang::identifier::Identifier;
 
-#[cfg(test)]
-use std::fmt;
-
 pub struct Script {
 	pub root: Root,
 }
@@ -198,53 +195,5 @@ pub enum Lvalue {
 	VariableLvalue {
 		pub name: Identifier,
 		pub analysis: Raw<VariableAnalysis>,
-	}
-}
-
-// PRINTING (test only) ////////////////////////////////////////////////////////////////////////////
-
-#[cfg(test)]
-impl fmt::Show for Script {
-	fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {
-		write!( f, "{}", self.statements )
-	}
-}
-
-#[cfg(test)]
-impl fmt::Show for Statement {
-	fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {
-		match *self {
-			
-			Throw { expression: ref e } => write!( f, "throw({})", e ),
-			ExpressionStatement { expression: ref e } => write!( f, "{}", e ),
-			
-			_ => write!( f, "<statement>" ),
-		}
-	}
-}
-
-#[cfg(test)]
-impl fmt::Show for Expression {
-	fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {
-		match *self {
-			
-			Function { parameters: ref p, block: ref b, .. } => write!( f, "function({})\\{{}\\}", p, b ),
-			
-			Addition { left: ref l, right: ref r } => write!( f, "({}+{})", l, r ),
-			Multiplication { left: ref l, right: ref r } => write!( f, "({}*{})", l, r ),
-			
-			Integer { value: v } => write!( f, "{}", v ),
-			Boolean { value: v } => write!( f, "{}", if v { "true" } else { "false" } ),
-			Nothing => write!( f, "nothing" ),
-			
-			_ => write!( f, "<expression>" ),
-		}
-	}
-}
-
-#[cfg(test)]
-impl fmt::Show for FunctionParameter {
-	fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {
-		write!( f, "<parameter>" )
 	}
 }

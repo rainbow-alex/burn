@@ -19,7 +19,7 @@ pub fn is_truthy( value: &value::Value ) -> bool {
 		=> true,
 		
 		value::StaticSpecial(..) => true,
-		value::RcSpecial( ref r ) => r.get().is_truthy(),
+		value::RcSpecial( ref r ) => r.get().get().is_truthy(),
 		
 	}
 }
@@ -38,7 +38,7 @@ pub fn repr( value: &value::Value ) -> StrBuf {
 		value::Module(..) => "<Module>".to_owned(),
 		
 		value::StaticSpecial( special ) => special.repr(),
-		value::RcSpecial( ref r ) => r.get().repr(),
+		value::RcSpecial( ref r ) => r.get().get().repr(),
 	}
 }
 
@@ -52,7 +52,7 @@ pub fn to_string( value: &value::Value ) -> StrBuf {
 		value::String( ref s ) => s.get().get_value().into_owned(),
 		
 		value::StaticSpecial( special ) => special.repr(),
-		value::RcSpecial( ref r ) => r.get().to_string(),
+		value::RcSpecial( ref r ) => r.get().get().to_string(),
 		
 		_ => { value.repr() }
 	}
@@ -120,7 +120,7 @@ pub fn union( left: value::Value, right: value::Value ) -> Result<value::Value,v
 		return Err( create_type_error( format!( "Can't create type union: {} is not a type", right.repr() ) ) );
 	}
 	
-	Ok( value::TypeUnion( Rc::new( box TypeUnion::new( left, right ) ) ) )
+	Ok( value::TypeUnion( Rc::new( TypeUnion::new( left, right ) ) ) )
 }
 
 pub fn is( value: &value::Value, type_: &value::Value ) -> Result<bool,value::Value> {
@@ -141,8 +141,8 @@ pub fn is( value: &value::Value, type_: &value::Value ) -> Result<bool,value::Va
 		}
 		
 		value::RcSpecial( ref r ) => {
-			if r.get().is_type() {
-				return Ok( r.get().type_test( value ) )
+			if r.get().get().is_type() {
+				return Ok( r.get().get().type_test( value ) )
 			}
 		}
 		

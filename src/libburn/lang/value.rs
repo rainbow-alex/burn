@@ -7,7 +7,7 @@ use mem::raw::Raw;
 use lang::string::String;
 use lang::type_::{TypeUnion, TypeIntersection};
 use lang::module::Module;
-use lang::special::{StaticSpecial, RcSpecialWrapper};
+use lang::special::{StaticSpecial, RcSpecial};
 use builtin::intrinsic::operations;
 
 #[deriving(Clone)]
@@ -25,7 +25,7 @@ pub enum Value {
 	Module( Raw<Module> ),
 	
 	StaticSpecial( StaticSpecial ),
-	RcSpecial( Rc<RcSpecialWrapper> ),
+	RcSpecial( Rc<RcSpecial> ),
 }
 
 	impl Value {

@@ -1,31 +1,27 @@
 use std::mem;
-use mem::raw::Raw;
+use std::ptr;
 
 #[unsafe_no_drop_flag]
 pub struct Gc<T> {
-	ptr: *T,
+	ptr: *mut GcWrapper<T>,
 }
 
 	impl<T:GarbageCollected> Gc<T> {
 		
-		pub fn get( &self ) -> &mut T {
+		#[inline(always)]
+		fn get_wrapper( &self ) -> &mut GcWrapper<T> {
 			unsafe { mem::transmute( self.ptr ) }
 		}
 		
-		pub fn mark( &self ) {
-			let thing = self.get();
-			thing.get_gc_header().marked = true;
-			thing.mark();
-		}
-		
-		pub fn as_raw( &self ) -> Raw<T> {
-			Raw { ptr: self.ptr }
+		#[inline(always)]
+		pub fn get( &self ) -> &mut T {
+			&mut self.get_wrapper().value
 		}
 	}
 	
 	impl<T:GarbageCollected> Clone for Gc<T> {
 		fn clone( &self ) -> Gc<T> {
-			self.get().get_gc_header().rc += 1;
+			unsafe { (*self.ptr).rc += 1; }
 			Gc { ptr: self.ptr }
 		}
 	}
@@ -33,45 +29,38 @@ pub struct Gc<T> {
 	#[unsafe_destructor]
 	impl<T:GarbageCollected> Drop for Gc<T> {
 		fn drop( &mut self ) {
-			if self.ptr != 0 as *T {
-				
-				let thing = self.get();
-				thing.get_gc_header().rc -= 1;
-				if thing.get_gc_header().rc == 0 {
-					thing.die();
+			unsafe {
+				if ! self.ptr.is_null() {
+					
+					(*self.ptr).rc -= 1;
+					if (*self.ptr).rc == 0 {
+						self.get().die();
+					}
+					
+					self.ptr = ptr::mut_null();
 				}
-				
-				self.ptr = 0 as *T;
 			}
 		}
 	}
 
-pub struct GcHeader {
+pub struct GcWrapper<T> {
 	rc: uint,
 	marked: bool,
 	is_immortal: bool,
+	value: T,
 }
 
-	impl GcHeader {
-		pub fn new() -> GcHeader {
-			GcHeader {
-				rc: 0,
-				marked: false,
-				is_immortal: false,
-			}
-		}
-	}
-
 pub trait GarbageCollected {
-	fn get_gc_header<'l>( &'l mut self ) -> &'l mut GcHeader;
-	fn mark( &mut self ) { fail!( "TODO" ); }
-	fn become_immortal( &mut self ) { fail!( "TODO" ); }
-	fn die( &mut self ) {}
+	
+	fn mark( &mut self );
+	
+	fn die( &mut self ) {
+	}
 }
 
 pub struct GarbageCollectedManager<T> {
-	alive: Vec<Raw<T>>,
-	immortal: Vec<Box<T>>,
+	alive: Vec<*mut GcWrapper<T>>,
+	immortal: Vec<Box<GcWrapper<T>>>,
 }
 
 	impl<T:GarbageCollected> GarbageCollectedManager<T> {
@@ -82,24 +71,20 @@ pub struct GarbageCollectedManager<T> {
 			}
 		}
 		
-		pub fn register( & mut self, mut thing: Box<T> ) -> Gc<T> {
-			thing.get_gc_header().rc += 1;
+		pub fn register( &mut self, thing: T ) -> Gc<T> {
 			
-			let gc = Gc { ptr: &*thing as *T };
-			self.alive.push( gc.as_raw() );
-			unsafe { mem::forget( thing ); }
+			let mut gc_wrapper = box GcWrapper {
+				rc: 1,
+				marked: false,
+				is_immortal: false,
+				value: thing,
+			};
 			
-			gc
-		}
-		
-		pub fn register_immortal( &mut self, mut thing: Box<T> ) -> Gc<T> {
-			thing.get_gc_header().is_immortal = true;
-			thing.become_immortal();
+			let ptr = &mut *gc_wrapper as *mut GcWrapper<T>;
+			self.alive.push( ptr );
+			unsafe { mem::forget( gc_wrapper ); }
 			
-			let gc = Gc { ptr: &*thing as *T };
-			self.immortal.push( thing );
-			
-			gc
+			Gc { ptr: ptr }
 		}
 		
 		pub fn sweep( &mut self ) {
@@ -110,28 +95,28 @@ pub struct GarbageCollectedManager<T> {
 				let n = self.alive.len();
 				while i < n {
 					
-					let raw = self.alive.get( i );
-					let gc_header = raw.get().get_gc_header();
+					let ptr = *self.alive.get( i );
 					
-					if gc_header.is_immortal {
+					if (*ptr).is_immortal {
 						
-						let owned = mem::transmute::<_,Box<T>>( raw.ptr );
+						let owned = mem::transmute::<_,Box<GcWrapper<T>>>( ptr );
 						self.immortal.push( owned );
 						i += 1;
 						
-					} else if gc_header.marked {
+					} else if (*ptr).marked {
 						
-						gc_header.marked = false;
+						(*ptr).marked = false;
 						i += 1;
 						end += 1;
 						
 					} else {
 						
-						let mut owned = mem::transmute::<_,Box<T>>( raw.ptr );
+						let mut owned = mem::transmute::<_,Box<GcWrapper<T>>>( ptr );
 						
-						// if the rc is not 0, this was part of some cycle, and die() was not yet called
-						if owned.get_gc_header().rc != 0 {
-							owned.die();
+						// if the rc is not 0, this was part of some cycle,
+						// and die() was not yet called
+						if owned.rc != 0 {
+							owned.value.die();
 						}
 						
 						drop( owned );
@@ -147,12 +132,12 @@ pub struct GarbageCollectedManager<T> {
 	#[unsafe_destructor]
 	impl<T:GarbageCollected> Drop for GarbageCollectedManager<T> {
 		fn drop( &mut self ) {
-			for t in self.alive.iter() {
-				unsafe {
-					let mut owned = mem::transmute::<_,Box<T>>( *t );
+			unsafe {
+				for &t in self.alive.iter() {
+					let mut owned = mem::transmute::<_,Box<GcWrapper<T>>>( t );
 					
-					if owned.get_gc_header().rc != 0 {
-						owned.die();
+					if owned.rc != 0 {
+						owned.value.die();
 					}
 					
 					drop( owned );
@@ -164,45 +149,15 @@ pub struct GarbageCollectedManager<T> {
 #[cfg(test)]
 mod test {
 	
-	use mem::gc::{Gc, GcHeader, GarbageCollected, GarbageCollectedManager};
+	use super::{GarbageCollected, GarbageCollectedManager};
 	
 	struct Thing {
-		gc: GcHeader,
-		refs: Vec<Gc<Thing>>,
-		freed: bool,
 		dropped: *mut bool,
 	}
 	
-		impl Thing {
-			fn new( dropped: *mut bool ) -> Thing {
-				Thing {
-					gc: GcHeader::new(),
-					refs: Vec::new(),
-					freed: false,
-					dropped: dropped,
-				}
-			}
-		}
-		
 		impl GarbageCollected for Thing {
 			
-			fn get_gc_header<'l>( &'l mut self ) -> &'l mut GcHeader {
-				&mut self.gc
-			}
-			
 			fn mark( &mut self ) {
-				for r in self.refs.iter() {
-					r.mark();
-				}
-			}
-			
-			fn become_immortal( &mut self ) {
-				// nop
-			}
-			
-			fn die( &mut self ) {
-				assert!( ! self.freed );
-				self.freed = true;
 			}
 		}
 		
@@ -215,32 +170,32 @@ mod test {
 		}
 	
 	#[test]
-	fn test_refcounting() {
+	fn test() {
 		
-		let mut manager = GarbageCollectedManager::<Thing>::new();
-		
-		assert!( manager.alive.len() == 0 );
-		
+		let mut things = GarbageCollectedManager::<Thing>::new();
 		let mut dropped = false;
-		let thing = manager.register( box Thing::new( &mut dropped as *mut bool ) );
-		assert!( manager.alive.len() == 1 );
-		assert!( thing.get().get_gc_header().rc == 1 );
+		
+		assert!( things.alive.len() == 0 );
+		
+		let thing = things.register( Thing { dropped: &mut dropped } );
+		assert!( things.alive.len() == 1 );
+		assert!( thing.get_wrapper().rc == 1 );
 		
 		let thing2 = thing.clone();
-		assert!( manager.alive.len() == 1 );
-		assert!( thing.get().get_gc_header().rc == 2 );
-		assert!( thing2.get().get_gc_header().rc == 2 );
+		assert!( things.alive.len() == 1 );
+		assert!( thing.get_wrapper().rc == 2 );
+		assert!( thing2.get_wrapper().rc == 2 );
 		
 		drop( thing );
-		assert!( manager.alive.len() == 1 );
-		assert!( thing2.get().get_gc_header().rc == 1 );
+		assert!( things.alive.len() == 1 );
+		assert!( thing2.get_wrapper().rc == 1 );
 		
 		drop( thing2 );
-		assert!( manager.alive.len() == 1 );
+		assert!( things.alive.len() == 1 );
 		assert!( dropped == false );
 		
-		manager.sweep();
-		assert!( manager.alive.len() == 0 );
+		things.sweep();
+		assert!( things.alive.len() == 0 );
 		assert!( dropped == true );
 	}
 }

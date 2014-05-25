@@ -1,8 +1,7 @@
 use std::fmt;
-use mem::rc::{RcHeader, RefCounted};
+use mem::rc::RefCounted;
 
 pub struct String {
-	rc: RcHeader,
 	value: StrBuf,
 }
 
@@ -10,7 +9,6 @@ pub struct String {
 		
 		pub fn new( value: StrBuf ) -> String {
 			String {
-				rc: RcHeader::new(),
 				value: value,
 			}
 		}
@@ -24,11 +22,7 @@ pub struct String {
 		}
 	}
 	
-	impl RefCounted for String {
-		fn get_rc_header<'l>( &'l mut self ) -> &'l mut RcHeader {
-			&mut self.rc
-		}
-	}
+	impl RefCounted for String {}
 	
 	impl fmt::Show for String {
 		fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {

@@ -1,12 +1,11 @@
 use std::vec::Vec;
 use lang::value;
 use lang::identifier::Identifier;
-use mem::rc::{Rc, RcHeader, RefCounted};
-use mem::gc::{GcHeader, GarbageCollected};
+use mem::rc::{Rc, RefCounted};
+use mem::gc::GarbageCollected;
 use vm::code::Code;
 
 pub struct Function {
-	gc: GcHeader,
 	pub definition: Rc<FunctionDefinition>,
 	pub static_bound_variables: Vec<value::Value>,
 	pub shared_bound_variables: Vec<value::SharedValue>,
@@ -18,7 +17,6 @@ pub struct Function {
 			definition: Rc<FunctionDefinition>
 		) -> Function {
 			Function {
-				gc: GcHeader::new(),
 				definition: definition,
 				static_bound_variables: Vec::new(), // TODO
 				shared_bound_variables: Vec::new(), // TODO
@@ -28,13 +26,12 @@ pub struct Function {
 	
 	impl GarbageCollected for Function {
 		
-		fn get_gc_header<'l>( &'l mut self ) -> &'l mut GcHeader {
-			&'l mut self.gc
+		fn mark( &mut self ) {
+			// TODO
 		}
 	}
 
 pub struct FunctionDefinition {
-	rc: RcHeader,
 	pub parameters: Vec<FunctionParameterDefinition>,
 	pub code: Code,
 	pub n_static_bound_variables: uint,
@@ -45,7 +42,6 @@ pub struct FunctionDefinition {
 		
 		pub fn new( parameters: Vec<FunctionParameterDefinition>, code: Code ) -> FunctionDefinition {
 			FunctionDefinition {
-				rc: RcHeader::new(),
 				parameters: parameters,
 				code: code,
 				n_static_bound_variables: 0,
@@ -54,12 +50,7 @@ pub struct FunctionDefinition {
 		}
 	}
 	
-	impl RefCounted for FunctionDefinition {
-		
-		fn get_rc_header<'l>( &'l mut self ) -> &'l mut RcHeader {
-			&mut self.rc
-		}
-	}
+	impl RefCounted for FunctionDefinition {}
 
 pub struct FunctionParameterDefinition {
 	type_: Option<Code>,

@@ -1,38 +1,30 @@
 use std::mem;
 use std::ptr;
-use mem::raw::Raw;
 
 #[unsafe_no_drop_flag]
 pub struct Rc<T> {
-	ptr: *T
+	ptr: *mut RcWrapper<T>,
 }
 
 	impl<T:RefCounted> Rc<T> {
 		
-		pub fn new( mut thing: Box<T> ) -> Rc<T> {
-			thing.get_rc_header().rc += 1;
-			 Rc { ptr: unsafe { mem::transmute::<_,*T>( thing ) } }
-		}
-		
-		pub fn from_raw( thing: Raw<T> ) -> Rc<T> {
-			thing.get().get_rc_header().rc += 1;
-			Rc { ptr: thing.ptr }
+		pub fn new( thing: T ) -> Rc<T> {
+			let rc_wrapper = box RcWrapper {
+				rc: 1,
+				value: thing,
+			};
+			Rc { ptr: unsafe { mem::transmute::<_,*mut RcWrapper<T>>( rc_wrapper ) } }
 		}
 		
 		#[inline(always)]
 		pub fn get( &self ) -> &mut T {
-			unsafe { mem::transmute( self.ptr ) }
-		}
-		
-		#[inline(always)]
-		pub fn as_raw( &self ) -> Raw<T> {
-			Raw { ptr: self.ptr }
+			unsafe { mem::transmute( &(*self.ptr).value ) }
 		}
 	}
 	
 	impl<T:RefCounted> Clone for Rc<T> {
 		fn clone( &self ) -> Rc<T> {
-			self.get().get_rc_header().rc += 1;
+			unsafe { (*self.ptr).rc += 1; }
 			Rc { ptr: self.ptr }
 		}
 	}
@@ -40,61 +32,44 @@ pub struct Rc<T> {
 	#[unsafe_destructor]
 	impl<T:RefCounted> Drop for Rc<T> {
 		fn drop( &mut self ) {
-			if ! self.ptr.is_null() {
-				
-				self.get().get_rc_header().rc -= 1;
-				if self.get().get_rc_header().rc == 0 {
-					drop( unsafe { mem::transmute::<_,Box<T>>( self.ptr ) } );
+			unsafe {
+				if ! self.ptr.is_null() {
+					
+					(*self.ptr).rc -= 1;
+					if (*self.ptr).rc == 0 {
+						drop( mem::transmute::<_,Box<RcWrapper<T>>>( self.ptr ) );
+					}
+					
+					self.ptr = ptr::mut_null();
 				}
-				
-				self.ptr = ptr::null();
 			}
 		}
 	}
 
-pub struct RcHeader {
+struct RcWrapper<T> {
 	rc: uint,
+	value: T,
 }
 
-	impl RcHeader {
-		pub fn new() -> RcHeader {
-			RcHeader {
-				rc: 0,
-			}
-		}
-	}
-
-pub trait RefCounted {
-	
-	fn get_rc_header<'l>( &'l mut self ) -> &'l mut RcHeader;
-}
+pub trait RefCounted {}
 
 #[cfg(test)]
 mod test {
 	
-	use mem::rc::{Rc, RcHeader, RefCounted};
+	use mem::rc::{Rc, RefCounted};
 	
 	struct Thing {
-		rc: RcHeader,
 		dropped: *mut bool,
 	}
 	
 		impl Thing {
 			
 			pub fn new( dropped: *mut bool ) -> Thing {
-				Thing {
-					rc: RcHeader::new(),
-					dropped: dropped,
-				}
+				Thing { dropped: dropped }
 			}
 		}
 		
-		impl RefCounted for Thing {
-			
-			fn get_rc_header<'l>( &'l mut self ) -> &'l mut RcHeader {
-				&mut self.rc
-			}
-		}
+		impl RefCounted for Thing {}
 		
 		impl Drop for Thing {
 			fn drop( &mut self ) {
@@ -109,7 +84,7 @@ mod test {
 		let mut dropped = false;
 		let thing = Thing::new( &mut dropped );
 		
-		let r = Rc::new( box thing );
+		let r = Rc::new( thing );
 		assert!( ! dropped );
 		
 		drop( r );
@@ -121,7 +96,7 @@ mod test {
 		let mut dropped = false;
 		let thing = Thing::new( &mut dropped );
 		
-		let r1 = Rc::new( box thing );
+		let r1 = Rc::new( thing );
 		let r2 = r1.clone();
 		
 		drop( r1 );
@@ -137,24 +112,17 @@ mod bench {
 	
 	use std::mem;
 	use test::Bencher;
-	use mem::rc::{Rc, RcHeader, RefCounted};
+	use mem::rc::{Rc, RefCounted};
 	
 	struct Thing {
-		rc: RcHeader,
 		a: int,
 	}
 	
-		impl RefCounted for Thing {
-			
-			fn get_rc_header<'l>( &'l mut self ) -> &'l mut RcHeader {
-				&mut self.rc
-			}
-		}
+		impl RefCounted for Thing {}
 	
 	#[bench]
 	fn bench_raw_deref( bench: &mut Bencher ) {
-		let thing = box Thing {
-			rc: RcHeader::new(),
+		let thing = Thing {
 			a: 3,
 		};
 		let r: *Thing = unsafe { mem::transmute( thing ) };
@@ -166,8 +134,7 @@ mod bench {
 	
 	#[bench]
 	fn bench_rc_get( bench: &mut Bencher ) {
-		let thing = box Thing {
-			rc: RcHeader::new(),
+		let thing = Thing {
 			a: 3,
 		};
 		let r = Rc::new( thing );

@@ -1,7 +1,8 @@
 use lang::value;
 use lang::string::String;
 use lang::special;
-use lang::special::{StaticSpecialDef, Special, RcSpecial};
+use lang::special::{StaticSpecialDef, Special, RefCountedSpecial};
+use mem::rc::RefCounted;
 
 pub static TypeError: StaticSpecialDef = StaticSpecialDef {
 	repr: "TypeError",
@@ -26,7 +27,8 @@ struct TypeError {
 		fn is_throwable( &self ) -> bool { true }
 	}
 	
-	impl RcSpecial for TypeError {}
+	impl RefCounted for TypeError {}
+	impl RefCountedSpecial for TypeError {}
 
 pub fn create_type_error( message: StrBuf ) -> value::Value {
 	special::create_rc_value( TypeError { message: String::new( message ) } )
@@ -57,4 +59,4 @@ struct ArgumentError {
 		fn is_throwable( &self ) -> bool { true }
 	}
 	
-	impl RcSpecial for ArgumentError {}
+	impl RefCounted for ArgumentError {}

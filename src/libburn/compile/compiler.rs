@@ -454,9 +454,8 @@ struct Compilation {
 				node::String {
 					value: ref value,
 				} => {
-					let string = box String::new( value.clone() );
 					self.code.opcodes.push( opcode::PushString { index: self.code.strings.len() } );
-					self.code.strings.push( Rc::new( string ) );
+					self.code.strings.push( Rc::new( String::new( value.clone() ) ) );
 				}
 				
 				node::Variable {
@@ -560,10 +559,10 @@ struct Compilation {
 					let mut compilation = Compilation::new();
 					compilation.compile_function( expression );
 					let code = compilation.code;
-					let definition = box FunctionDefinition::new( Vec::new(), code );
+					let definition = Rc::new( FunctionDefinition::new( Vec::new(), code ) );
 					
 					self.code.opcodes.push( opcode::PushFunction { index: self.code.functions.len() } );
-					self.code.functions.push( Rc::new( definition ) );
+					self.code.functions.push( definition );
 				}
 				
 				_ => fail!(), // TODO

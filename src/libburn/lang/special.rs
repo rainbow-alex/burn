@@ -1,6 +1,6 @@
 use lang::value;
 use lang::identifier::Identifier;
-use mem::rc::{Rc, RcHeader, RefCounted};
+use mem::rc::{Rc, RefCounted};
 
 pub trait Special {
 	fn repr( &self ) -> StrBuf;
@@ -11,45 +11,33 @@ pub trait Special {
 	fn is_throwable( &self ) -> bool { false }
 }
 
-pub trait RcSpecial : Special {}
+pub trait RefCountedSpecial : Special + RefCounted {}
 
-pub struct RcSpecialWrapper {
-	rc: RcHeader,
+pub struct RcSpecial {
 	type_id: ::core::intrinsics::TypeId,
-	special: Box<RcSpecial>,
+	special: Box<RefCountedSpecial>,
 }
 
-	impl RcSpecialWrapper {
+	impl RcSpecial {
 		
 		pub fn is<T:'static>( &self ) -> bool {
 			unsafe { ::core::intrinsics::type_id::<T>() == self.type_id }
 		}
 		
-		#[inline]
-		pub fn repr( &self ) -> StrBuf { self.special.repr() }
-		#[inline]
-		pub fn to_string( &self ) -> StrBuf { self.special.to_string() }
-		#[inline]
-		pub fn is_truthy( &self ) -> bool { self.special.is_truthy() }
-		#[inline]
-		pub fn is_type( &self ) -> bool { self.special.is_type() }
-		#[inline]
-		pub fn type_test( &self, value: &value::Value ) -> bool { self.special.type_test( value ) }
-		#[inline]
-		pub fn is_throwable( &self ) -> bool { self.special.is_throwable() }
-	}
-	
-	impl RefCounted for RcSpecialWrapper {
-		fn get_rc_header<'l>( &'l mut self ) -> &'l mut RcHeader {
-			&mut self.rc
+		#[inline(always)]
+		pub fn get<'a>( &'a mut self ) -> &'a mut RefCountedSpecial {
+			// won't coerce without a tmp var, seems to be a bug
+			let tmp: &mut RefCountedSpecial = self.special;
+			tmp
 		}
 	}
 
-pub fn create_rc_value<T:'static+RcSpecial>( special: T ) -> value::Value {
-	value::RcSpecial( Rc::new( box RcSpecialWrapper {
-		rc: RcHeader::new(),
+	impl RefCounted for RcSpecial {}
+
+pub fn create_rc_value<T:RefCountedSpecial+'static>( special: T ) -> value::Value {
+	value::RcSpecial( Rc::new( RcSpecial {
 		type_id: unsafe { ::core::intrinsics::type_id::<T>() },
-		special: box special as Box<RcSpecial>,
+		special: box special,
 	} ) )
 }
 
