@@ -564,6 +564,48 @@ struct Parsing<'src> {
 					left = box node::Is { left: left, right: right };
 				}
 				
+				token::EqualsEquals => {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_COMPARE + 1 ) );
+					left = box node::Eq { left: left, right: right };
+				}
+				
+				token::BangEquals => {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_COMPARE + 1 ) );
+					left = box node::Neq { left: left, right: right };
+				}
+				
+				token::LeftAngleBracket => {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_COMPARE + 1 ) );
+					left = box node::Lt { left: left, right: right };
+				}
+				
+				token::RightAngleBracket => {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_COMPARE + 1 ) );
+					left = box node::Gt { left: left, right: right };
+				}
+				
+				token::LeftAngleBracketEquals => {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_COMPARE + 1 ) );
+					left = box node::LtEq { left: left, right: right };
+				}
+				
+				token::RightAngleBracketEquals => {
+					self.read();
+					self.skip_newlines();
+					let right = unwrap_or_return_err!( self.parse_op_expression( PRECEDENCE_COMPARE + 1 ) );
+					left = box node::GtEq { left: left, right: right };
+				}
+				
 				_ => {}
 			}
 			

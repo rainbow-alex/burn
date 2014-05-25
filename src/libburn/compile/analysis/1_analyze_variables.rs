@@ -381,6 +381,12 @@ pub struct AnalyzeVariables {
 				| node::Subtraction { left: ref mut left, right: ref mut right }
 				| node::Union { left: ref mut left, right: ref mut right }
 				| node::Is { left: ref mut left, right: ref mut right }
+				| node::Eq { left: ref mut left, right: ref mut right }
+				| node::Neq { left: ref mut left, right: ref mut right }
+				| node::Lt { left: ref mut left, right: ref mut right }
+				| node::Gt { left: ref mut left, right: ref mut right }
+				| node::LtEq { left: ref mut left, right: ref mut right }
+				| node::GtEq { left: ref mut left, right: ref mut right }
 				| node::And { left: ref mut left, right: ref mut right }
 				| node::Or { left: ref mut left, right: ref mut right }
 				=> {

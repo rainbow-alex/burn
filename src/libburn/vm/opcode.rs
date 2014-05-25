@@ -60,6 +60,12 @@ pub enum OpCode {
 	
 	// Operations
 	Is,
+	Eq,
+	Neq,
+	Lt,
+	Gt,
+	LtEq,
+	GtEq,
 	Union,
 	Add,
 	Subtract,

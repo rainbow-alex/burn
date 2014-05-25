@@ -373,12 +373,96 @@ pub struct VirtualMachine {
 										data_stack.push( self.intrinsic.get( id ).clone() );
 									}
 									
-									// Is //////////////////////////////////////////////////////////
+									// Operators ///////////////////////////////////////////////////
 									
 									opcode::Is => {
 										let right = data_stack.pop().unwrap();
 										let left = data_stack.pop().unwrap();
 										match intrinsic::operations::is( &left, &right ) {
+											Ok( result ) => {
+												data_stack.push( value::Boolean( result ) );
+											}
+											Err( err ) => {
+												flow = flow::Throwing( err );
+												continue 'flow_loop;
+											}
+										};
+									}
+									
+									opcode::Eq => {
+										let right = data_stack.pop().unwrap();
+										let left = data_stack.pop().unwrap();
+										match intrinsic::operations::eq( &left, &right ) {
+											Ok( result ) => {
+												data_stack.push( value::Boolean( result ) );
+											}
+											Err( err ) => {
+												flow = flow::Throwing( err );
+												continue 'flow_loop;
+											}
+										};
+									}
+									
+									opcode::Neq => {
+										let right = data_stack.pop().unwrap();
+										let left = data_stack.pop().unwrap();
+										match intrinsic::operations::neq( &left, &right ) {
+											Ok( result ) => {
+												data_stack.push( value::Boolean( result ) );
+											}
+											Err( err ) => {
+												flow = flow::Throwing( err );
+												continue 'flow_loop;
+											}
+										};
+									}
+									
+									opcode::Lt => {
+										let right = data_stack.pop().unwrap();
+										let left = data_stack.pop().unwrap();
+										match intrinsic::operations::lt( &left, &right ) {
+											Ok( result ) => {
+												data_stack.push( value::Boolean( result ) );
+											}
+											Err( err ) => {
+												flow = flow::Throwing( err );
+												continue 'flow_loop;
+											}
+										};
+									}
+									
+									opcode::Gt => {
+										let right = data_stack.pop().unwrap();
+										let left = data_stack.pop().unwrap();
+										match intrinsic::operations::gt( &left, &right ) {
+											Ok( result ) => {
+												data_stack.push( value::Boolean( result ) );
+											}
+											Err( err ) => {
+												flow = flow::Throwing( err );
+												continue 'flow_loop;
+											}
+										};
+									}
+									
+									opcode::LtEq => {
+										let right = data_stack.pop().unwrap();
+										let left = data_stack.pop().unwrap();
+										match intrinsic::operations::lt_eq( &left, &right ) {
+											Ok( result ) => {
+												data_stack.push( value::Boolean( result ) );
+											}
+											Err( err ) => {
+												flow = flow::Throwing( err );
+												continue 'flow_loop;
+											}
+										};
+									}
+									
+									opcode::GtEq => {
+										let right = data_stack.pop().unwrap();
+										let left = data_stack.pop().unwrap();
+										match intrinsic::operations::gt_eq( &left, &right ) {
 											Ok( result ) => {
 												data_stack.push( value::Boolean( result ) );
 											}

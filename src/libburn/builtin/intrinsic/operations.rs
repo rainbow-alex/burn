@@ -153,3 +153,27 @@ pub fn is( value: &value::Value, type_: &value::Value ) -> Result<bool,value::Va
 		format!( "{} is not a type", type_.repr() )
 	) )
 }
+
+pub fn eq( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
+	return Err( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+}
+
+pub fn neq( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
+	return Err( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+}
+
+pub fn lt( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
+	return Err( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+}
+
+pub fn gt( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
+	return Err( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+}
+
+pub fn lt_eq( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
+	gt( left, right ).and_then( |v| { !v } )
+}
+
+pub fn gt_eq( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
+	return Err( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+}

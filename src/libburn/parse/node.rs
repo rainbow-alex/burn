@@ -115,6 +115,30 @@ pub enum Expression {
 		pub left: Box<Expression>,
 		pub right: Box<Expression>,
 	},
+	Eq {
+		pub left: Box<Expression>,
+		pub right: Box<Expression>,
+	},
+	Neq {
+		pub left: Box<Expression>,
+		pub right: Box<Expression>,
+	},
+	Lt {
+		pub left: Box<Expression>,
+		pub right: Box<Expression>,
+	},
+	Gt {
+		pub left: Box<Expression>,
+		pub right: Box<Expression>,
+	},
+	LtEq {
+		pub left: Box<Expression>,
+		pub right: Box<Expression>,
+	},
+	GtEq {
+		pub left: Box<Expression>,
+		pub right: Box<Expression>,
+	},
 	
 	Union {
 		pub left: Box<Expression>,

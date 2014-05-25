@@ -535,6 +535,60 @@ struct Compilation {
 					self.code.opcodes.push( opcode::Is );
 				}
 				
+				node::Eq {
+					left: ref left,
+					right: ref right,
+				} => {
+					self.compile_expression( *left );
+					self.compile_expression( *right );
+					self.code.opcodes.push( opcode::Eq );
+				}
+				
+				node::Neq {
+					left: ref left,
+					right: ref right,
+				} => {
+					self.compile_expression( *left );
+					self.compile_expression( *right );
+					self.code.opcodes.push( opcode::Neq );
+				}
+				
+				node::Lt {
+					left: ref left,
+					right: ref right,
+				} => {
+					self.compile_expression( *left );
+					self.compile_expression( *right );
+					self.code.opcodes.push( opcode::Lt );
+				}
+				
+				node::Gt {
+					left: ref left,
+					right: ref right,
+				} => {
+					self.compile_expression( *left );
+					self.compile_expression( *right );
+					self.code.opcodes.push( opcode::Gt );
+				}
+				
+				node::LtEq {
+					left: ref left,
+					right: ref right,
+				} => {
+					self.compile_expression( *left );
+					self.compile_expression( *right );
+					self.code.opcodes.push( opcode::LtEq );
+				}
+				
+				node::GtEq {
+					left: ref left,
+					right: ref right,
+				} => {
+					self.compile_expression( *left );
+					self.compile_expression( *right );
+					self.code.opcodes.push( opcode::GtEq );
+				}
+				
 				node::Function {
 					parameters: _,
 					frame: ref frame,
