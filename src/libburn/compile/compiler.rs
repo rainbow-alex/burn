@@ -482,7 +482,7 @@ struct Compilation {
 					identifier: identifier,
 				} => {
 					// TODO
-					self.code.opcodes.push( opcode::LoadIntrinsic { name: identifier } );
+					self.code.opcodes.push( opcode::LoadImplicit { name: identifier } );
 				}
 				
 				node::Call {

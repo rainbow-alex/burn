@@ -8,7 +8,7 @@ use lang::string::String;
 use lang::type_::{TypeUnion, TypeIntersection};
 use lang::module::Module;
 use lang::special::{StaticSpecial, RcSpecial};
-use builtin::intrinsic::operations;
+use builtin::burn::operations;
 
 #[deriving(Clone)]
 pub enum Value {

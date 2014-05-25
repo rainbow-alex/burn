@@ -1,5 +1,4 @@
 use std::mem;
-use builtin::intrinsic;
 use compile::compiler::Compiler;
 use error::Error;
 use lang::function::Function;
@@ -15,19 +14,35 @@ use vm::frame::Frame;
 use vm::opcode;
 use vm::repl::ReplState;
 use vm::result;
+use builtin::burn::{implicit, operations, types, errors};
 
 pub struct VirtualMachine {
 	functions: GarbageCollectedManager<Function>,
-	intrinsic: Box<Module>,
+	module_root: Box<Module>,
+	implicit: Raw<Module>,
 }
 
 	impl VirtualMachine {
 		
 		pub fn new() -> VirtualMachine {
 			
+			let mut root = box Module::new();
+			let mut burn = box Module::new();
+			
+			let implicit = box implicit::create_module();
+			let implicit_ref = Raw::new( implicit );
+			burn.add_module( "implicit", implicit );
+			
+			burn.add_module( "errors", box errors::create_module() );
+			burn.add_module( "types", box types::create_module() );
+			
+			burn.lock();
+			root.add_module( "burn", burn );
+			
 			VirtualMachine {
 				functions: GarbageCollectedManager::new(),
-				intrinsic: box intrinsic::create_module(),
+				module_root: root,
+				implicit: implicit_ref,
 			}
 		}
 		
@@ -154,7 +169,7 @@ pub struct VirtualMachine {
 									}
 									
 									opcode::JumpIfPopFalsy { instruction: i } => {
-										if ! intrinsic::operations::is_truthy( & data_stack.pop().unwrap() ) {
+										if ! operations::is_truthy( & data_stack.pop().unwrap() ) {
 											frame.instruction = i;
 											continue 'instruction_loop;
 										}
@@ -222,10 +237,10 @@ pub struct VirtualMachine {
 									opcode::Throw => {
 										let throwable = data_stack.pop().unwrap();
 										
-										if intrinsic::types::is_throwable( &throwable ) {
+										if types::is_throwable( &throwable ) {
 											flow = flow::Throwing( throwable );
 										} else {
-											flow = flow::Throwing( intrinsic::errors::create_type_error( format!( "{} is not Throwable.", throwable.repr() ) ) );
+											flow = flow::Throwing( errors::create_type_error( format!( "{} is not Throwable.", throwable.repr() ) ) );
 										}
 										
 										continue 'flow_loop;
@@ -239,7 +254,7 @@ pub struct VirtualMachine {
 										};
 										
 										let type_ = data_stack.pop().unwrap();
-										let result = intrinsic::operations::is( &throwable, &type_ );
+										let result = operations::is( &throwable, &type_ );
 										
 										match result {
 											Ok( true ) => {
@@ -369,8 +384,8 @@ pub struct VirtualMachine {
 									
 									// Names ///////////////////////////////////////////////////////
 									
-									opcode::LoadIntrinsic { name: ref id } => {
-										data_stack.push( self.intrinsic.get( id ).clone() );
+									opcode::LoadImplicit { name: id } => {
+										data_stack.push( self.implicit.get().get( id ).clone() );
 									}
 									
 									// Operators ///////////////////////////////////////////////////
@@ -378,7 +393,7 @@ pub struct VirtualMachine {
 									opcode::Is => {
 										let right = data_stack.pop().unwrap();
 										let left = data_stack.pop().unwrap();
-										match intrinsic::operations::is( &left, &right ) {
+										match operations::is( &left, &right ) {
 											Ok( result ) => {
 												data_stack.push( value::Boolean( result ) );
 											}
@@ -392,7 +407,7 @@ pub struct VirtualMachine {
 									opcode::Eq => {
 										let right = data_stack.pop().unwrap();
 										let left = data_stack.pop().unwrap();
-										match intrinsic::operations::eq( &left, &right ) {
+										match operations::eq( &left, &right ) {
 											Ok( result ) => {
 												data_stack.push( value::Boolean( result ) );
 											}
@@ -406,7 +421,7 @@ pub struct VirtualMachine {
 									opcode::Neq => {
 										let right = data_stack.pop().unwrap();
 										let left = data_stack.pop().unwrap();
-										match intrinsic::operations::neq( &left, &right ) {
+										match operations::neq( &left, &right ) {
 											Ok( result ) => {
 												data_stack.push( value::Boolean( result ) );
 											}
@@ -420,7 +435,7 @@ pub struct VirtualMachine {
 									opcode::Lt => {
 										let right = data_stack.pop().unwrap();
 										let left = data_stack.pop().unwrap();
-										match intrinsic::operations::lt( &left, &right ) {
+										match operations::lt( &left, &right ) {
 											Ok( result ) => {
 												data_stack.push( value::Boolean( result ) );
 											}
@@ -434,7 +449,7 @@ pub struct VirtualMachine {
 									opcode::Gt => {
 										let right = data_stack.pop().unwrap();
 										let left = data_stack.pop().unwrap();
-										match intrinsic::operations::gt( &left, &right ) {
+										match operations::gt( &left, &right ) {
 											Ok( result ) => {
 												data_stack.push( value::Boolean( result ) );
 											}
@@ -448,7 +463,7 @@ pub struct VirtualMachine {
 									opcode::LtEq => {
 										let right = data_stack.pop().unwrap();
 										let left = data_stack.pop().unwrap();
-										match intrinsic::operations::lt_eq( &left, &right ) {
+										match operations::lt_eq( &left, &right ) {
 											Ok( result ) => {
 												data_stack.push( value::Boolean( result ) );
 											}
@@ -462,7 +477,7 @@ pub struct VirtualMachine {
 									opcode::GtEq => {
 										let right = data_stack.pop().unwrap();
 										let left = data_stack.pop().unwrap();
-										match intrinsic::operations::gt_eq( &left, &right ) {
+										match operations::gt_eq( &left, &right ) {
 											Ok( result ) => {
 												data_stack.push( value::Boolean( result ) );
 											}
@@ -476,7 +491,7 @@ pub struct VirtualMachine {
 									opcode::Union => {
 										let right = data_stack.pop().unwrap();
 										let left = data_stack.pop().unwrap();
-										match intrinsic::operations::union( left, right ) {
+										match operations::union( left, right ) {
 											Ok( result ) => {
 												data_stack.push( result );
 											}
@@ -490,7 +505,7 @@ pub struct VirtualMachine {
 									opcode::Add => {
 										let right = data_stack.pop().unwrap();
 										let left = data_stack.pop().unwrap();
-										match intrinsic::operations::add( &left, &right ) {
+										match operations::add( &left, &right ) {
 											Ok( result ) => data_stack.push( result ),
 											Err( err ) => {
 												flow = flow::Throwing( err );
@@ -502,7 +517,7 @@ pub struct VirtualMachine {
 									opcode::Subtract => {
 										let right = data_stack.pop().unwrap();
 										let left = data_stack.pop().unwrap();
-										match intrinsic::operations::subtract( &left, &right ) {
+										match operations::subtract( &left, &right ) {
 											Ok( result ) => data_stack.push( result ),
 											Err( err ) => {
 												flow = flow::Throwing( err );

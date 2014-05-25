@@ -1,6 +1,6 @@
 use lang::value;
-use builtin::intrinsic;
-use builtin::intrinsic::errors::create_type_error;
+use builtin::burn::implicit;
+use builtin::burn::errors::create_type_error;
 use mem::rc::Rc;
 
 pub fn is_truthy( value: &value::Value ) -> bool {
@@ -110,17 +110,15 @@ pub fn subtract( left: &value::Value, right: &value::Value ) -> Result<value::Va
 
 pub fn union( left: value::Value, right: value::Value ) -> Result<value::Value,value::Value> {
 	
-	use lang::type_::TypeUnion;
-	
-	if ! intrinsic::types::is_type( &left ) {
+	if ! implicit::is_type( &left ) {
 		return Err( create_type_error( format!( "Can't create type union: {} is not a type", left.repr() ) ) );
 	}
 	
-	if ! intrinsic::types::is_type( &right ) {
+	if ! implicit::is_type( &right ) {
 		return Err( create_type_error( format!( "Can't create type union: {} is not a type", right.repr() ) ) );
 	}
 	
-	Ok( value::TypeUnion( Rc::new( TypeUnion::new( left, right ) ) ) )
+	Ok( value::TypeUnion( Rc::new( ::lang::type_::TypeUnion::new( left, right ) ) ) )
 }
 
 pub fn is( value: &value::Value, type_: &value::Value ) -> Result<bool,value::Value> {
@@ -171,7 +169,7 @@ pub fn gt( left: &value::Value, right: &value::Value ) -> Result<bool,value::Val
 }
 
 pub fn lt_eq( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
-	gt( left, right ).and_then( |v| { !v } )
+	gt( left, right ).and_then( |v| { Ok( !v ) } )
 }
 
 pub fn gt_eq( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {

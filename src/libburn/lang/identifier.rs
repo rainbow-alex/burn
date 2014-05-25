@@ -7,11 +7,6 @@ use mem::raw::Raw;
 
 static mut ALL: Raw<HashMap<StrBuf,Box<IdentifierContainer>>> = Raw { ptr: 0 as *_ };
 
-#[inline(always)]
-pub fn id( value: &str ) -> Identifier {
-	Identifier::find_or_create( value )
-}
-
 struct IdentifierContainer {
 	value: StrBuf,
 }

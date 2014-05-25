@@ -59,7 +59,12 @@ pub mod vm {
 }
 
 pub mod builtin {
-	pub mod intrinsic;
+	pub mod burn {
+		pub mod implicit;
+		pub mod operations;
+		pub mod errors;
+		pub mod types;
+	}
 }
 
 pub static mut DEBUG: bool = false;

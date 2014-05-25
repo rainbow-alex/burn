@@ -1,10 +1,21 @@
 use lang::value;
+use lang::module::Module;
 use lang::string::String;
 use lang::special;
-use lang::special::{StaticSpecialDef, Special, RefCountedSpecial};
+use lang::special::{StaticSpecialDef, StaticSpecial, Special, RefCountedSpecial};
 use mem::rc::RefCounted;
 
-pub static TypeError: StaticSpecialDef = StaticSpecialDef {
+pub fn create_module() -> Module {
+	let mut errors = Module::new();
+	errors.add( "TypeError", value::StaticSpecial( StaticSpecial::new( &TypeError ) ) );
+	errors.add( "ArgumentError", value::StaticSpecial( StaticSpecial::new( &ArgumentError ) ) );
+	errors.lock();
+	errors
+}
+
+
+
+static TypeError: StaticSpecialDef = StaticSpecialDef {
 	repr: "TypeError",
 	has_method: special::static_has_no_methods,
 	type_test: is_type_error,
@@ -36,7 +47,7 @@ pub fn create_type_error( message: StrBuf ) -> value::Value {
 
 
 
-pub static ArgumentError: StaticSpecialDef = StaticSpecialDef {
+static ArgumentError: StaticSpecialDef = StaticSpecialDef {
 	repr: "ArgumentError",
 	has_method: special::static_has_no_methods,
 	type_test: is_argument_error,
