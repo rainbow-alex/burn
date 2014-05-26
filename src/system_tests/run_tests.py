@@ -25,7 +25,7 @@ def run_tests( file_or_directory ):
 		source, expected_output = open( file_or_directory ).read().split( "\n---\n", 2 )
 		
 		process = subprocess.Popen(
-			"burn -",
+			"build/bin/burn -",
 			stdin = subprocess.PIPE,
 			stdout = subprocess.PIPE,
 			stderr = subprocess.STDOUT,
