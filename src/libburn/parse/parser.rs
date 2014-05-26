@@ -1,55 +1,42 @@
 use std::vec::Vec;
-use error::ParseError;
+use vm::error::ParseError;
 use parse::token;
 use parse::lexer::Lexer;
 use parse::node;
 use parse::literal;
-use compile::analysis::FrameAnalysis;
+use vm::analysis::FrameAnalysis;
 use mem::raw::Raw;
 use lang::identifier::Identifier;
 
 type ParseResult<T> = Result<T,ParseError>;
 
-pub struct Parser {
-	bogus: bool, // see https://github.com/mozilla/rust/issues/12660
+pub fn parse_script<'src>( source: &'src str ) -> Result<Box<node::Script>,ParseError> {
+	
+	let mut parsing = Parsing {
+		lexer: Lexer::new( source ),
+		buffer: Vec::new(),
+		newline_policy: HeedNewlines,
+	};
+	
+	match parsing.parse_root() {
+		Ok( root ) => Ok( box node::Script { root: root } ),
+		Err( e ) => Err( e ),
+	}
 }
 
-	impl Parser {
-		
-		pub fn new() -> Parser {
-			Parser {
-				bogus: false,
-			}
-		}
-		
-		pub fn parse_script<'src>( &self, source: &'src str ) -> Result<Box<node::Script>,ParseError> {
-			
-			let mut parsing = Parsing {
-				lexer: Lexer::new( source ),
-				buffer: Vec::new(),
-				newline_policy: HeedNewlines,
-			};
-			
-			match parsing.parse_root() {
-				Ok( root ) => Ok( box node::Script { root: root } ),
-				Err( e ) => Err( e ),
-			}
-		}
-		
-		pub fn parse_repl( &self, source: &str ) -> Result<Box<node::Repl>,ParseError>{
-			
-			let mut parsing = Parsing {
-				lexer: Lexer::new( source ),
-				buffer: Vec::new(),
-				newline_policy: HeedNewlines,
-			};
-			
-			match parsing.parse_root() {
-				Ok( root ) => Ok( box node::Repl { root: root } ),
-				Err( e ) => Err( e ),
-			}
-		}
+pub fn parse_repl( source: &str ) -> Result<Box<node::Repl>,ParseError>{
+	
+	let mut parsing = Parsing {
+		lexer: Lexer::new( source ),
+		buffer: Vec::new(),
+		newline_policy: HeedNewlines,
+	};
+	
+	match parsing.parse_root() {
+		Ok( root ) => Ok( box node::Repl { root: root } ),
+		Err( e ) => Err( e ),
 	}
+}
 
 struct Parsing<'src> {
 	lexer: Lexer<'src>,
@@ -228,6 +215,7 @@ struct Parsing<'src> {
 		fn parse_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
 			match self.peek() {
 				
+				token::Import => self.parse_import_statement(),
 				token::Let => self.parse_let_statement(),
 				token::Print => self.parse_print_statement(),
 				token::Throw => self.parse_throw_statement(),
@@ -259,6 +247,42 @@ struct Parsing<'src> {
 					}
 				}
 			}
+		}
+		
+		fn parse_import_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
+			
+			let keyword = self.read();
+			assert!( keyword == token::Import );
+			
+			let mut path = Vec::new();
+			
+			loop {
+				
+				match self.peek() {
+					token::Identifier ( identifier ) => {
+						path.push( Identifier::find_or_create( identifier ) );
+						self.peek();
+					}
+					_ => {
+						fail!();
+					}
+				}
+				
+				self.read();
+				
+				match self.peek() {
+					token::Dot => {
+						self.read();
+					}
+					_ => {
+						break;
+					}
+				}
+			}
+			
+			Ok( box node::Import {
+				path: path,
+			} )
 		}
 		
 		fn parse_if_statement( &mut self ) -> ParseResult<Box<node::Statement>> {

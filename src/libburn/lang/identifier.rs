@@ -35,11 +35,22 @@ pub struct Identifier {
 				Identifier { ptr: Raw::new( *container ) }
 			}
 		}
+		
+		#[inline]
+		pub fn get_value<'l>( &'l self ) -> &'l str {
+			self.ptr.get().value.as_slice()
+		}
 	}
 	
 	impl Hash for Identifier {
 		fn hash( &self, state: &mut SipState ) {
 			self.ptr.ptr.hash( state );
+		}
+	}
+	
+	impl Clone for Identifier {
+		fn clone( &self ) -> Identifier {
+			*self
 		}
 	}
 	

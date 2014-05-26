@@ -1,7 +1,7 @@
+use mem::rc::Rc;
 use lang::string::String;
 use lang::function::FunctionDefinition;
-use vm::opcode;
-use mem::rc::Rc;
+use vm::bytecode::opcode;
 
 pub struct Code {
 	pub n_local_variables: uint,

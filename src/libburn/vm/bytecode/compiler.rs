@@ -1,94 +1,78 @@
-use error::AnalysisError;
-use parse::node;
-use lang::function::FunctionDefinition;
-use lang::string::String;
 use mem::raw::Raw;
 use mem::rc::Rc;
-use vm::code::Code;
-use vm::opcode;
-use compile::analysis;
-use compile::analysis::FrameAnalysis;
-use compile::analysis::analyze_variables::AnalyzeVariables;
-use compile::analysis::determine_allocation::DetermineAllocation;
+use parse::node;
+use lang::string::String;
+use lang::function::FunctionDefinition;
+use vm::error::AnalysisError;
+use vm::bytecode::code::Code;
+use vm::bytecode::opcode;
+use vm::analysis;
+use vm::analysis::FrameAnalysis;
+use vm::analysis::scopes::AnalyzeScopes;
+use vm::analysis::allocation::AnalyzeAllocation;
+use vm::repl;
 
-pub struct Compiler;
-
-	impl Compiler {
-		
-		pub fn new() -> Compiler {
-			Compiler
-		}
-		
-		pub fn compile_script( &mut self, script: &mut node::Script ) -> Result<Code,Vec<AnalysisError>> {
-			
-			if unsafe { ::DEBUG } { println!( "COMPILER: Analyzing variables..." ); }
-			
-			{
-				let mut pass = AnalyzeVariables::new();
-				pass.analyze_root( &mut script.root );
-				if pass.errors.len() > 0 {
-					return Err( pass.errors );
-				}
-			}
-			
-			if unsafe { ::DEBUG } { println!( "COMPILER: Determing allocation..." ); }
-			
-			{
-				let mut pass = DetermineAllocation::new();
-				pass.analyze_root( &mut script.root );
-				if pass.errors.len() > 0 {
-					return Err( pass.errors );
-				}
-			}
-			
-			if unsafe { ::DEBUG } { println!( "COMPILER: Compiling..." ); }
-			
-			let code = {
-				let mut compilation = Compilation::new();
-				compilation.compile_root( &script.root );
-				compilation.code
-			};
-			
-			if unsafe { ::DEBUG } { println!( "COMPILER: Done." ); code.dump(); }
-			
-			Ok( code )
-		}
-		
-		pub fn compile_repl( &mut self, repl: &mut node::Repl, repl_state: &mut ::vm::repl::ReplState ) -> Result<Code,Vec<AnalysisError>> {
-			
-			if unsafe { ::DEBUG } { println!( "COMPILER: Analyzing variables..." ); }
-			
-			{
-				let mut pass = AnalyzeVariables::new();
-				pass.analyze_repl_root( &mut repl.root, repl_state );
-				if pass.errors.len() > 0 {
-					return Err( pass.errors );
-				}
-			}
-			
-			if unsafe { ::DEBUG } { println!( "COMPILER: Determing allocation..." ); }
-			
-			{
-				let mut pass = DetermineAllocation::new();
-				pass.analyze_repl_root( &mut repl.root, repl_state );
-				if pass.errors.len() > 0 {
-					return Err( pass.errors );
-				}
-			}
-			
-			if unsafe { ::DEBUG } { println!( "COMPILER: Compiling..." ); }
-			
-			let code = {
-				let mut compilation = Compilation::new();
-				compilation.compile_root( &repl.root );
-				compilation.code
-			};
-			
-			if unsafe { ::DEBUG } { println!( "COMPILER: Done." ); code.dump(); }
-			
-			Ok( code )
-		}
+pub fn compile_script( script: &mut node::Script ) -> Result<Code,Vec<AnalysisError>> {
+	
+	debug!( { println!( "COMPILER: Analyzing variables..." ); } )
+	
+	let mut pass = AnalyzeScopes::new();
+	pass.analyze_root( &mut script.root );
+	if pass.errors.len() > 0 {
+		return Err( pass.errors );
 	}
+	
+	debug!( { println!( "COMPILER: Determing allocation..." ); } )
+	
+	let mut pass = AnalyzeAllocation::new();
+	pass.analyze_root( &mut script.root );
+	if pass.errors.len() > 0 {
+		return Err( pass.errors );
+	}
+	
+	debug!( { println!( "COMPILER: Compiling..." ); } )
+	
+	let code = {
+		let mut compilation = Compilation::new();
+		compilation.compile_root( &script.root );
+		compilation.code
+	};
+	
+	debug!( { println!( "COMPILER: Done." ); code.dump(); } )
+	
+	Ok( code )
+}
+
+pub fn compile_repl( repl: &mut node::Repl, repl_state: &mut repl::State ) -> Result<Code,Vec<AnalysisError>> {
+	
+	debug!( { println!( "COMPILER: Analyzing variables..." ); } )
+	
+	let mut pass = AnalyzeScopes::new();
+	pass.analyze_repl_root( &mut repl.root, repl_state );
+	if pass.errors.len() > 0 {
+		return Err( pass.errors );
+	}
+	
+	debug!( { println!( "COMPILER: Determing allocation..." ); } )
+	
+	let mut pass = AnalyzeAllocation::new();
+	pass.analyze_repl_root( &mut repl.root, repl_state );
+	if pass.errors.len() > 0 {
+		return Err( pass.errors );
+	}
+	
+	debug!( { println!( "COMPILER: Compiling..." ); } )
+	
+	let code = {
+		let mut compilation = Compilation::new();
+		compilation.compile_root( &repl.root );
+		compilation.code
+	};
+	
+	debug!( { println!( "COMPILER: Done." ); code.dump(); } )
+	
+	Ok( code )
+}
 
 struct Compilation {
 	code: Code,
@@ -184,6 +168,12 @@ struct Compilation {
 							};
 						}
 					}
+				}
+				
+				node::Import {
+					path: _,
+				} => {
+					self.code.opcodes.push( opcode::Import { id: 0 } );
 				}
 				
 				node::Let {
@@ -609,4 +599,3 @@ struct Compilation {
 			}
 		}
 	}
-

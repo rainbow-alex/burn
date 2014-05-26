@@ -1,8 +1,8 @@
-use error::AnalysisError;
+use vm::error::AnalysisError;
 use parse::node;
-use compile::analysis;
-use compile::analysis::{FrameAnalysis, VariableAnalysis, ClosureAnalysis, Binding};
-use vm::repl::ReplState;
+use vm::analysis;
+use vm::analysis::{FrameAnalysis, VariableAnalysis, ClosureAnalysis, Binding};
+use vm::repl;
 
 struct Frame {
 	n_local_variables: uint,
@@ -11,15 +11,15 @@ struct Frame {
 	n_shared_bound_variables: uint,
 }
 
-pub struct DetermineAllocation {
+pub struct AnalyzeAllocation {
 	frames: Vec<Frame>,
 	pub errors: Vec<AnalysisError>,
 }
 
-	impl DetermineAllocation {
+	impl AnalyzeAllocation {
 		
-		pub fn new() -> DetermineAllocation {
-			DetermineAllocation {
+		pub fn new() -> AnalyzeAllocation {
+			AnalyzeAllocation {
 				frames: Vec::new(),
 				errors: Vec::new(),
 			}
@@ -49,7 +49,7 @@ pub struct DetermineAllocation {
 			self.analyze_frame( &mut root.frame, 0 );
 		}
 		
-		pub fn analyze_repl_root( &mut self, root: &mut node::Root, repl_state: &mut ReplState ) {
+		pub fn analyze_repl_root( &mut self, root: &mut node::Root, repl_state: &mut repl::State ) {
 			self.analyze_frame( &mut root.frame, repl_state.variables.len() );
 		}
 		

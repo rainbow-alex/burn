@@ -3,10 +3,10 @@ extern crate burn;
 use std::os;
 use std::io;
 use std::path::posix::Path;
-use burn::error::Error;
-use burn::vm::virtual_machine::VirtualMachine;
+use burn::vm::Error;
+use burn::vm::VirtualMachine;
 use burn::vm::result;
-use burn::vm::repl::ReplState;
+use burn::repl;
 
 enum Input {
 	Stdin,
@@ -129,7 +129,7 @@ fn process_input( input: Input, args: Vec<StrBuf> ) {
 fn repl() {
 	
 	let mut vm = VirtualMachine::new();
-	let mut state = ReplState::new();
+	let mut state = repl::State::new();
 	
 	loop {
 		

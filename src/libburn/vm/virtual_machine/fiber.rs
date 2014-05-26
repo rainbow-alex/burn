@@ -1,7 +1,7 @@
 use lang::value;
-use vm::frame::Frame;
-use vm::flow;
-use vm::flow::{Flow, FlowPoint};
+use vm::virtual_machine::frame::Frame;
+use vm::virtual_machine::flow;
+use vm::virtual_machine::flow::{Flow, FlowPoint};
 
 pub struct Fiber {
 	pub frames: Vec<Frame>,

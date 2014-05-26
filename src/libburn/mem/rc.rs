@@ -9,16 +9,18 @@ pub struct Rc<T> {
 	impl<T:RefCounted> Rc<T> {
 		
 		pub fn new( thing: T ) -> Rc<T> {
-			let rc_wrapper = box RcWrapper {
+			let mut rc_wrapper = box RcWrapper {
 				rc: 1,
 				value: thing,
 			};
-			Rc { ptr: unsafe { mem::transmute::<_,*mut RcWrapper<T>>( rc_wrapper ) } }
+			let ptr = &mut *rc_wrapper as *mut RcWrapper<T>;
+			unsafe { mem::forget( rc_wrapper ); }
+			Rc { ptr: ptr }
 		}
 		
 		#[inline(always)]
 		pub fn get( &self ) -> &mut T {
-			unsafe { mem::transmute( &(*self.ptr).value ) }
+			unsafe { &mut (*self.ptr).value }
 		}
 	}
 	
@@ -73,9 +75,7 @@ mod test {
 		
 		impl Drop for Thing {
 			fn drop( &mut self ) {
-				unsafe {
-					*self.dropped = true;
-				}
+				unsafe { *self.dropped = true; }
 			}
 		}
 	
@@ -104,43 +104,5 @@ mod test {
 		
 		drop( r2 );
 		assert!( dropped );
-	}
-}
-
-#[cfg(test)]
-mod bench {
-	
-	use std::mem;
-	use test::Bencher;
-	use mem::rc::{Rc, RefCounted};
-	
-	struct Thing {
-		a: int,
-	}
-	
-		impl RefCounted for Thing {}
-	
-	#[bench]
-	fn bench_raw_deref( bench: &mut Bencher ) {
-		let thing = Thing {
-			a: 3,
-		};
-		let r: *Thing = unsafe { mem::transmute( thing ) };
-		
-		bench.iter( || {
-			assert!( unsafe { (*r).a } == 3 );
-		} );
-	}
-	
-	#[bench]
-	fn bench_rc_get( bench: &mut Bencher ) {
-		let thing = Thing {
-			a: 3,
-		};
-		let r = Rc::new( thing );
-		
-		bench.iter( || {
-			assert!( r.get().a == 3 );
-		} );
 	}
 }

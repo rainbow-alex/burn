@@ -13,10 +13,12 @@ pub struct String {
 			}
 		}
 		
+		#[inline]
 		pub fn get_value<'l>( &'l self ) -> &'l str {
 			self.value.as_slice()
 		}
 		
+		#[inline]
 		pub fn len( &self ) -> uint {
 			self.value.len()
 		}

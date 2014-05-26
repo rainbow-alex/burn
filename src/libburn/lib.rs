@@ -1,16 +1,27 @@
 #![crate_type="lib"]
 #![crate_id="burn#0.1"]
-#![feature(macro_rules, struct_variant)]
+#![feature(macro_rules, struct_variant, globs)]
 #![allow(unnecessary_parens)]
+
+// this lint is a but bugged
+// https://github.com/mozilla/rust/pull/14413
+#![allow(visible_private_types)]
 
 extern crate core;
 extern crate collections;
 #[cfg(test)]
 extern crate test;
 
-pub mod error;
+pub use api::*;
+mod api;
+
+#[macro_export]
+macro_rules! debug (
+	( $b:stmt ) => { if unsafe { ::DEBUG } { $b } }
+)
 
 mod parse {
+	
 	pub mod token;
 	pub mod node;
 	
@@ -20,12 +31,7 @@ mod parse {
 	pub mod literal;
 }
 
-mod compile {
-	pub mod analysis;
-	pub mod compiler;
-}
-
-pub mod lang {
+mod lang {
 	
 	pub mod string;
 	pub mod identifier;
@@ -39,26 +45,29 @@ pub mod lang {
 	pub mod value;
 }
 
-pub mod mem {
+mod mem {
 	pub mod raw;
 	pub mod rc;
 	pub mod gc;
 }
 
-pub mod vm {
-	pub mod code;
-	pub mod opcode;
-	pub mod fiber;
-	pub mod frame;
-	pub mod flow;
+mod vm {
 	
-	pub mod result;
+	pub mod analysis;
+	
+	pub mod bytecode {
+		pub mod code;
+		pub mod opcode;
+		pub mod compiler;
+	}
+	
 	pub mod virtual_machine;
 	
+	pub mod error;
 	pub mod repl;
 }
 
-pub mod builtin {
+mod builtin {
 	pub mod burn {
 		pub mod implicit;
 		pub mod operations;

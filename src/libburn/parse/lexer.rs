@@ -170,6 +170,7 @@ impl<'src> Lexer<'src> {
 					"for" => token::For,
 					"function" => token::Function,
 					"if" => token::If,
+					"import" => token::Import,
 					"in" => token::In,
 					"is" => token::Is,
 					"let" => token::Let,

@@ -2,10 +2,8 @@ use parse::node;
 use mem::raw::Raw;
 use lang::identifier::Identifier;
 
-#[path="analysis/1_analyze_variables.rs"]
-pub mod analyze_variables;
-#[path="analysis/2_determine_allocation.rs"]
-pub mod determine_allocation;
+pub mod scopes;
+pub mod allocation;
 
 type Time = uint;
 

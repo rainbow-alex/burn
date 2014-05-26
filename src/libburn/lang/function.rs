@@ -1,14 +1,17 @@
 use std::vec::Vec;
-use lang::value;
-use lang::identifier::Identifier;
 use mem::rc::{Rc, RefCounted};
 use mem::gc::GarbageCollected;
-use vm::code::Code;
+use lang::value;
+use lang::identifier::Identifier;
+use vm::bytecode::code::Code;
 
 pub struct Function {
+	#[doc(hidden)]
 	pub definition: Rc<FunctionDefinition>,
+	#[doc(hidden)]
 	pub static_bound_variables: Vec<value::Value>,
-	pub shared_bound_variables: Vec<value::SharedValue>,
+	#[doc(hidden)]
+	pub shared_bound_variables: Vec<Rc<value::Value>>,
 }
 
 	impl Function {

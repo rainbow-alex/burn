@@ -9,13 +9,9 @@ pub struct Gc<T> {
 	impl<T:GarbageCollected> Gc<T> {
 		
 		#[inline(always)]
-		fn get_wrapper( &self ) -> &mut GcWrapper<T> {
-			unsafe { mem::transmute( self.ptr ) }
-		}
-		
-		#[inline(always)]
 		pub fn get( &self ) -> &mut T {
-			&mut self.get_wrapper().value
+			unsafe { &mut (*self.ptr).value }
+			//&mut self.get_wrapper().value
 		}
 	}
 	
@@ -179,16 +175,12 @@ mod test {
 		
 		let thing = things.register( Thing { dropped: &mut dropped } );
 		assert!( things.alive.len() == 1 );
-		assert!( thing.get_wrapper().rc == 1 );
 		
 		let thing2 = thing.clone();
 		assert!( things.alive.len() == 1 );
-		assert!( thing.get_wrapper().rc == 2 );
-		assert!( thing2.get_wrapper().rc == 2 );
 		
 		drop( thing );
 		assert!( things.alive.len() == 1 );
-		assert!( thing2.get_wrapper().rc == 1 );
 		
 		drop( thing2 );
 		assert!( things.alive.len() == 1 );

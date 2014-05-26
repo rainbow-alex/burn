@@ -1,8 +1,6 @@
-use std::mem;
-use std::ptr;
 use lang::function::Function;
 use mem::gc::Gc;
-use mem::rc::Rc;
+use mem::rc::{Rc, RefCounted};
 use mem::raw::Raw;
 use lang::string::String;
 use lang::type_::{TypeUnion, TypeIntersection};
@@ -13,18 +11,29 @@ use builtin::burn::operations;
 #[deriving(Clone)]
 pub enum Value {
 	
+	#[doc(hidden)]
 	Nothing,
+	#[doc(hidden)]
 	Boolean( bool ),
+	#[doc(hidden)]
 	Integer( i64 ),
+	#[doc(hidden)]
 	Float( f64 ),
+	#[doc(hidden)]
 	String( Rc<String> ),
 	
+	#[doc(hidden)]
 	Function( Gc<Function> ),
+	#[doc(hidden)]
 	TypeUnion( Rc<TypeUnion> ),
+	#[doc(hidden)]
 	TypeIntersection( Rc<TypeIntersection> ),
+	#[doc(hidden)]
 	Module( Raw<Module> ),
 	
+	#[doc(hidden)]
 	StaticSpecial( StaticSpecial ),
+	#[doc(hidden)]
 	RcSpecial( Rc<RcSpecial> ),
 }
 
@@ -34,76 +43,5 @@ pub enum Value {
 		#[inline]
 		pub fn to_string( &self ) -> StrBuf { operations::to_string( self ) }
 	}
-
-struct SharedValueContainer {
-	rc: uint,
-	value: Value,
-}
-
-#[unsafe_no_drop_flag]
-pub struct SharedValue {
-	ptr: *SharedValueContainer,
-}
-
-	impl SharedValue {
-		
-		pub fn new( value: Value ) -> SharedValue {
-			let container = box SharedValueContainer { rc: 1, value: value };
-			SharedValue { ptr: unsafe { mem::transmute::<_,*SharedValueContainer>( container ) } }
-		}
-		
-		fn get_container( &self ) -> &mut SharedValueContainer {
-			unsafe { mem::transmute( self.ptr ) }
-		}
-		
-		pub fn get( &self ) -> &mut Value {
-			unsafe { mem::transmute( &(*self.ptr).value ) }
-		}
-	}
 	
-	impl Clone for SharedValue {
-		fn clone( &self ) -> SharedValue {
-			if self.ptr != ptr::null() {
-				self.get_container().rc += 1;
-			}
-			SharedValue { ptr: self.ptr }
-		}
-	}
-	
-	#[unsafe_destructor]
-	impl Drop for SharedValue {
-		
-		fn drop( &mut self ) {
-			if ! self.ptr.is_null() {
-				
-				self.get_container().rc -= 1;
-				
-				if self.get_container().rc == 0 {
-					drop( unsafe { mem::transmute::<_,Box<SharedValueContainer>>( self.ptr ) } );
-				}
-				
-				self.ptr = ptr::null();
-			}
-		}
-	}
-
-#[cfg(test)]
-mod test {
-	
-	use lang::value;
-	use lang::value::SharedValue;
-	
-	#[test]
-	fn test_shared() {
-		let shared1 = SharedValue::new( value::Nothing );
-		let shared2 = shared1.clone();
-		
-		assert!( match *shared1.get() { value::Nothing => true, _ => false } );
-		assert!( match *shared2.get() { value::Nothing => true, _ => false } );
-		
-		*shared1.get() = value::Integer( 3 );
-		
-		assert!( match *shared1.get() { value::Integer( 3 ) => true, _ => false } );
-		assert!( match *shared2.get() { value::Integer( 3 ) => true, _ => false } );
-	}
-}
+	impl RefCounted for Value {}

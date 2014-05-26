@@ -1,5 +1,5 @@
-use error::AnalysisError;
-use compile::analysis::{
+use vm::error::AnalysisError;
+use vm::analysis::{
 	FrameAnalysis,
 	VariableAnalysis,
 	ReadVariable,
@@ -11,23 +11,23 @@ use compile::analysis::{
 use parse::node;
 use mem::raw::Raw;
 use lang::identifier::Identifier;
-use vm::repl::ReplState;
+use vm::repl;
 
 struct Scope {
 	declared: Vec<Raw<VariableAnalysis>>,
 }
 
-pub struct AnalyzeVariables {
+pub struct AnalyzeScopes {
 	frames: Vec<Raw<FrameAnalysis>>,
 	scopes: Vec<Scope>,
 	time: Time,
 	pub errors: Vec<AnalysisError>,
 }
 
-	impl AnalyzeVariables {
+	impl AnalyzeScopes {
 		
-		pub fn new() -> AnalyzeVariables {
-			AnalyzeVariables {
+		pub fn new() -> AnalyzeScopes {
+			AnalyzeScopes {
 				frames: Vec::new(),
 				scopes: Vec::new(),
 				time: 0,
@@ -90,7 +90,7 @@ pub struct AnalyzeVariables {
 			self.pop_frame();
 		}
 		
-		pub fn analyze_repl_root( &mut self, root: &mut node::Root, repl_state: &mut ReplState ) {
+		pub fn analyze_repl_root( &mut self, root: &mut node::Root, repl_state: &mut repl::State ) {
 			
 			self.push_frame( &mut root.frame );
 			self.push_scope();
@@ -168,6 +168,8 @@ pub struct AnalyzeVariables {
 				=> {
 					self.analyze_expression( *expression );
 				}
+				
+				node::Import {..} => {}
 				
 				node::Return { expression: ref mut optional_expression }
 				=> {

@@ -56,6 +56,7 @@ pub enum OpCode {
 	LoadSharedBound { pub index: uint },
 	
 	// Names
+	Import { pub id: uint },
 	LoadImplicit { pub name: Identifier },
 	
 	// Operations

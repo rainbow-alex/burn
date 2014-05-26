@@ -1,5 +1,5 @@
 use std::vec::Vec;
-use compile::analysis::{FrameAnalysis, VariableAnalysis};
+use vm::analysis::{FrameAnalysis, VariableAnalysis};
 use mem::raw::Raw;
 use lang::identifier::Identifier;
 
@@ -20,24 +20,17 @@ pub struct Root {
 
 pub enum Statement {
 	
-	If {
-		pub test: Box<Expression>,
-		pub block: Vec<Box<Statement>>,
-		pub else_if_clauses: Vec<Box<ElseIf>>,
-		pub else_clause: Option<Box<Else>>,
+	ExpressionStatement {
+		pub expression: Box<Expression>,
 	},
 	
-	Try {
-		pub block: Vec<Box<Statement>>,
-		pub catch_clauses: Vec<Box<Catch>>,
-		pub else_clause: Option<Box<Else>>,
-		pub finally_clause: Option<Box<Finally>>,
+	Assignment {
+		pub lvalue: Box<Lvalue>,
+		pub rvalue: Box<Expression>,
 	},
 	
-	While {
-		pub test: Box<Expression>,
-		pub block: Vec<Box<Statement>>,
-		pub else_clause: Option<Box<Else>>,
+	Import {
+		pub path: Vec<Identifier>,
 	},
 	
 	Let {
@@ -59,13 +52,24 @@ pub enum Statement {
 		pub expression: Box<Expression>,
 	},
 	
-	Assignment {
-		pub lvalue: Box<Lvalue>,
-		pub rvalue: Box<Expression>,
+	If {
+		pub test: Box<Expression>,
+		pub block: Vec<Box<Statement>>,
+		pub else_if_clauses: Vec<Box<ElseIf>>,
+		pub else_clause: Option<Box<Else>>,
 	},
 	
-	ExpressionStatement {
-		pub expression: Box<Expression>,
+	Try {
+		pub block: Vec<Box<Statement>>,
+		pub catch_clauses: Vec<Box<Catch>>,
+		pub else_clause: Option<Box<Else>>,
+		pub finally_clause: Option<Box<Finally>>,
+	},
+	
+	While {
+		pub test: Box<Expression>,
+		pub block: Vec<Box<Statement>>,
+		pub else_clause: Option<Box<Else>>,
 	},
 }
 

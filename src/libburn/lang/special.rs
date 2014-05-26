@@ -54,7 +54,7 @@ pub struct StaticSpecialDef {
 
 #[deriving(Clone)]
 pub struct StaticSpecial {
-	pub def: &'static StaticSpecialDef,
+	def: &'static StaticSpecialDef,
 }
 
 	impl StaticSpecial {
