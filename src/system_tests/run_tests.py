@@ -6,6 +6,7 @@ import subprocess
 from difflib import Differ
 
 SHOW_OUTPUT = False
+EXIT_STATUS = 0
 
 def run_tests( file_or_directory ):
 	
@@ -39,6 +40,8 @@ def run_tests( file_or_directory ):
 			print "\033[32;1mOK\033[0m"
 		
 		else:
+			global EXIT_STATUS
+			EXIT_STATUS = 1
 			print "\033[31;1mFAIL\033[0m"
 			
 			for line in Differ().compare( expected_output.splitlines(1), actual_output.splitlines(1) ):
@@ -59,3 +62,5 @@ for arg in args or os.listdir( "." ):
 		print "File or directory does not exist: %s" % arg
 	else:
 		run_tests( arg )
+
+sys.exit( EXIT_STATUS )
