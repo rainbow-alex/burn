@@ -189,7 +189,7 @@ pub enum Expression {
 	},
 	
 	String {
-		pub value: StrBuf,
+		pub value: ::std::string::String,
 	},
 	Integer {
 		pub value: i64,

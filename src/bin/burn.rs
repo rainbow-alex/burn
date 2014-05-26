@@ -10,7 +10,7 @@ use burn::repl;
 
 enum Input {
 	Stdin,
-	File( StrBuf ),
+	File( String ),
 }
 
 fn main() {
@@ -38,7 +38,7 @@ fn main() {
 		}
 	}
 	
-	let remaining_args = args.collect::<Vec<StrBuf>>();
+	let remaining_args = args.collect::<Vec<String>>();
 	
 	match input {
 		Some( i ) => { process_input( i, remaining_args ); }
@@ -58,7 +58,7 @@ options:
 	);
 }
 
-fn process_input( input: Input, args: Vec<StrBuf> ) {
+fn process_input( input: Input, args: Vec<String> ) {
 	
 	(args); // TODO
 	
@@ -133,7 +133,7 @@ fn repl() {
 	
 	loop {
 		
-		let mut input = StrBuf::new();
+		let mut input = String::new();
 		loop {
 			print!( "> " );
 			let line = match io::stdin().read_line() {

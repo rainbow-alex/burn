@@ -1,5 +1,4 @@
 use mem::rc::Rc;
-use lang::string::String;
 use lang::function::FunctionDefinition;
 use vm::bytecode::opcode;
 

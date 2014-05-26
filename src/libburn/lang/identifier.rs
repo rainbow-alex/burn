@@ -5,10 +5,10 @@ use std::fmt;
 use collections::HashMap;
 use mem::raw::Raw;
 
-static mut ALL: Raw<HashMap<StrBuf,Box<IdentifierContainer>>> = Raw { ptr: 0 as *_ };
+static mut ALL: Raw<HashMap<String,Box<IdentifierContainer>>> = Raw { ptr: 0 as *_ };
 
 struct IdentifierContainer {
-	value: StrBuf,
+	value: String,
 }
 
 #[deriving(Copy, Eq, TotalEq)]
@@ -22,7 +22,7 @@ pub struct Identifier {
 			unsafe {
 				
 				if ALL.is_null() {
-					let all = box HashMap::<StrBuf,Box<IdentifierContainer>>::new();
+					let all = box HashMap::<String,Box<IdentifierContainer>>::new();
 					ALL = Raw::new( all );
 					mem::forget( all );
 				}

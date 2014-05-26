@@ -1,7 +1,6 @@
 use mem::raw::Raw;
 use mem::rc::Rc;
 use parse::node;
-use lang::string::String;
 use lang::function::FunctionDefinition;
 use vm::error::AnalysisError;
 use vm::bytecode::code::Code;
@@ -425,7 +424,7 @@ struct Compilation {
 					value: ref value,
 				} => {
 					self.code.opcodes.push( opcode::PushString { index: self.code.strings.len() } );
-					self.code.strings.push( Rc::new( String::new( value.clone() ) ) );
+					self.code.strings.push( Rc::new( value.clone() ) );
 				}
 				
 				node::Variable {

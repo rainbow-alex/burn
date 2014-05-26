@@ -33,7 +33,6 @@ mod parse {
 
 mod lang {
 	
-	pub mod string;
 	pub mod identifier;
 	
 	pub mod module;

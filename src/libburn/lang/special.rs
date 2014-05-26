@@ -3,8 +3,8 @@ use lang::identifier::Identifier;
 use mem::rc::{Rc, RefCounted};
 
 pub trait Special {
-	fn repr( &self ) -> StrBuf;
-	fn to_string( &self ) -> StrBuf { self.repr() }
+	fn repr( &self ) -> String;
+	fn to_string( &self ) -> String { self.repr() }
 	fn is_truthy( &self ) -> bool { true }
 	fn is_type( &self ) -> bool { false }
 	fn type_test( &self, &value::Value ) -> bool { fail!() }
@@ -64,7 +64,7 @@ pub struct StaticSpecial {
 		}
 		
 		#[inline]
-		pub fn repr( self ) -> StrBuf { self.def.repr.to_owned() }
+		pub fn repr( self ) -> String { self.def.repr.to_owned() }
 		#[inline]
 		pub fn is_truthy( self ) -> bool { true }
 		#[inline]

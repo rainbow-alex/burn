@@ -24,7 +24,7 @@ pub fn is_truthy( value: &value::Value ) -> bool {
 	}
 }
 
-pub fn repr( value: &value::Value ) -> StrBuf {
+pub fn repr( value: &value::Value ) -> String {
 	match *value {
 		
 		value::Nothing => "<Nothing>".to_owned(),
@@ -42,14 +42,14 @@ pub fn repr( value: &value::Value ) -> StrBuf {
 	}
 }
 
-pub fn to_string( value: &value::Value ) -> StrBuf {
+pub fn to_string( value: &value::Value ) -> String {
 	match *value {
 		
 		value::Nothing => "nothing".into_owned(),
 		value::Boolean( b ) => ( if b { "true" } else { "false" } ).into_owned(),
 		value::Integer( i ) => format!( "{}", i ),
 		value::Float( f ) => format!( "{}", f ),
-		value::String( ref s ) => s.get().get_value().into_owned(),
+		value::String( ref s ) => s.get().clone(),
 		
 		value::StaticSpecial( special ) => special.repr(),
 		value::RcSpecial( ref r ) => r.get().get().to_string(),

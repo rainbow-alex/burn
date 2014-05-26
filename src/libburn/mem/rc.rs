@@ -55,6 +55,8 @@ struct RcWrapper<T> {
 
 pub trait RefCounted {}
 
+impl RefCounted for String {}
+
 #[cfg(test)]
 mod test {
 	

@@ -1,6 +1,5 @@
 use lang::value;
 use lang::module::Module;
-use lang::string::String;
 use lang::special;
 use lang::special::{StaticSpecialDef, StaticSpecial, Special, RefCountedSpecial};
 use mem::rc::RefCounted;
@@ -33,16 +32,16 @@ struct TypeError {
 }
 
 	impl Special for TypeError {
-		fn repr( &self ) -> StrBuf { "<TypeError>".into_owned() }
-		fn to_string( &self ) -> StrBuf { format!( "TypeError: {}", self.message ) }
+		fn repr( &self ) -> String { "<TypeError>".into_owned() }
+		fn to_string( &self ) -> String { format!( "TypeError: {}", self.message ) }
 		fn is_throwable( &self ) -> bool { true }
 	}
 	
 	impl RefCounted for TypeError {}
 	impl RefCountedSpecial for TypeError {}
 
-pub fn create_type_error( message: StrBuf ) -> value::Value {
-	special::create_rc_value( TypeError { message: String::new( message ) } )
+pub fn create_type_error( message: String ) -> value::Value {
+	special::create_rc_value( TypeError { message: message } )
 }
 
 
@@ -65,8 +64,8 @@ struct ArgumentError {
 }
 
 	impl Special for ArgumentError {
-		fn repr( &self ) -> StrBuf { "<ArgumentError>".into_owned() }
-		fn to_string( &self ) -> StrBuf { format!( "ArgumentError: {}", self.message ) }
+		fn repr( &self ) -> String { "<ArgumentError>".into_owned() }
+		fn to_string( &self ) -> String { format!( "ArgumentError: {}", self.message ) }
 		fn is_throwable( &self ) -> bool { true }
 	}
 	

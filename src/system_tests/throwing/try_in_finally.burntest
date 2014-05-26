@@ -3,7 +3,7 @@ try {
 } finally {
 	try {
 		3 + "3"
-	} catch TypeError $e {
+	} catch $e {
 		print "caught"
 	}
 }

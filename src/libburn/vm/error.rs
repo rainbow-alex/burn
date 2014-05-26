@@ -4,7 +4,7 @@ pub trait Error {
 }
 
 pub struct ParseError {
-	pub message: StrBuf,
+	pub message: String,
 	pub source_offset: uint,
 }
 
@@ -14,7 +14,7 @@ pub struct ParseError {
 	}
 
 pub struct AnalysisError {
-	pub message: StrBuf,
+	pub message: String,
 	pub source_offset: uint,
 }
 

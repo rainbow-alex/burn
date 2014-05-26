@@ -132,7 +132,7 @@ struct Parsing<'src> {
 			self.buffer.shift().unwrap()
 		}
 		
-		fn err( &self, message: StrBuf ) -> ParseError {
+		fn err( &self, message: String ) -> ParseError {
 			ParseError {
 				source_offset: self.lexer.offset,
 				message: message,

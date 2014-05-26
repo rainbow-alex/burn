@@ -1,22 +1,21 @@
-use std::strbuf::StrBuf;
 use std::str::utf8_char_width;
 
-pub fn parse_int( source: &str ) -> Result<i64,StrBuf> {
+pub fn parse_int( source: &str ) -> Result<i64,String> {
 	match from_str::<i64>( source ) {
 		Some( i ) => Ok( i ),
 		None => Err( "Integer literal is out of range.".to_owned() ),
 	}
 }
 
-pub fn parse_float( source: &str ) -> Result<f64,StrBuf> {
+pub fn parse_float( source: &str ) -> Result<f64,String> {
 	match from_str::<f64>( source ) {
 		Some( f ) => Ok( f ),
 		None => Err( "Float literal is out of range.".to_owned() ),
 	}
 }
 
-pub fn parse_string( source: &str ) -> Result<StrBuf,(StrBuf,uint)> {
-	let mut buf = StrBuf::new();
+pub fn parse_string( source: &str ) -> Result<String,(String,uint)> {
+	let mut buf = String::new();
 	let raw: bool;
 	let delimiter: char;
 	let mut i: uint;

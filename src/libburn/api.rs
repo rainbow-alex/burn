@@ -1,6 +1,5 @@
 pub mod lang {
 	pub use lang::identifier::Identifier;
-	pub use lang::string::String;
 	pub use lang::function::Function;
 	pub use lang::module::Module;
 	pub use lang::special::{Special, RefCountedSpecial, StaticSpecialDef, StaticSpecial};
