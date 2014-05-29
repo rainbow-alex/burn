@@ -39,13 +39,11 @@ pub enum Token<'src> {
 	Catch,
 	Class,
 	Else,
-	Extends,
 	False,
 	Finally,
 	For,
 	Function,
 	If,
-	Import,
 	In,
 	Is,
 	Let,
@@ -60,6 +58,7 @@ pub enum Token<'src> {
 	True,
 	Try,
 	While,
+	Use,
 	
 	Identifier( &'src str ), // e.g. foobar
 	Variable( &'src str ), // e.g. $foobar (only foobar is stored)
@@ -114,13 +113,11 @@ pub enum Token<'src> {
 				Catch => write!( f, "catch" ),
 				Class => write!( f, "class" ),
 				Else => write!( f, "else" ),
-				Extends => write!( f, "extends" ),
 				False => write!( f, "false" ),
 				Finally => write!( f, "finally" ),
 				For => write!( f, "for" ),
 				Function => write!( f, "function" ),
 				If => write!( f, "if" ),
-				Import => write!( f, "import" ),
 				In => write!( f, "in" ),
 				Is => write!( f, "is" ),
 				Let => write!( f, "let" ),
@@ -135,6 +132,7 @@ pub enum Token<'src> {
 				True => write!( f, "true" ),
 				Try => write!( f, "try" ),
 				While => write!( f, "while" ),
+				Use => write!( f, "use" ),
 				
 				Identifier( v ) => write!( f, "IDENTIFIER({})", v ),
 				Variable( v ) => write!( f, "VARIABLE(${})", v ),

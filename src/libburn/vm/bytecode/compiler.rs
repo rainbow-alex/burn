@@ -1,81 +1,129 @@
+use std::mem;
 use mem::raw::Raw;
 use mem::rc::Rc;
-use parse::node;
+use parse::{parser, node};
 use lang::function::FunctionDefinition;
-use vm::error::AnalysisError;
+use lang::value;
+use vm::error::Error;
 use vm::bytecode::code::Code;
 use vm::bytecode::opcode;
-use vm::analysis;
-use vm::analysis::FrameAnalysis;
-use vm::analysis::scopes::AnalyzeScopes;
+use vm::analysis::annotation;
+use vm::analysis::resolution::AnalyzeResolution;
 use vm::analysis::allocation::AnalyzeAllocation;
+use vm::run::frame;
 use vm::repl;
 
-pub fn compile_script( script: &mut node::Script ) -> Result<Code,Vec<AnalysisError>> {
+pub fn compile_script( source: &str ) -> Result<frame::Frame,Vec<Box<Error>>> {
+	
+	debug!( { println!( "COMPILER: Parsing..." ); } )
+	
+	let mut ast = match parser::parse_script( source ) {
+		Ok( ast ) => ast,
+		Err( error ) => {
+			let mut errors = Vec::new();
+			errors.push( box error as Box<Error> );
+			return Err( errors );
+		}
+	};
 	
 	debug!( { println!( "COMPILER: Analyzing variables..." ); } )
 	
-	let mut pass = AnalyzeScopes::new();
-	pass.analyze_root( &mut script.root );
+	let mut pass = AnalyzeResolution::new();
+	pass.analyze_root( &mut ast.root );
 	if pass.errors.len() > 0 {
-		return Err( pass.errors );
+		return Err( pass.errors.move_iter().map( |e| { box e as Box<Error> } ).collect() );
 	}
 	
 	debug!( { println!( "COMPILER: Determing allocation..." ); } )
 	
 	let mut pass = AnalyzeAllocation::new();
-	pass.analyze_root( &mut script.root );
+	pass.analyze_root( &mut ast.root );
 	if pass.errors.len() > 0 {
-		return Err( pass.errors );
+		return Err( pass.errors.move_iter().map( |e| { box e as Box<Error> } ).collect() );
 	}
 	
 	debug!( { println!( "COMPILER: Compiling..." ); } )
 	
 	let code = {
 		let mut compilation = Compilation::new();
-		compilation.compile_root( &script.root );
+		compilation.compile_root( &mut ast.root );
 		compilation.code
 	};
 	
 	debug!( { println!( "COMPILER: Done." ); code.dump(); } )
 	
-	Ok( code )
+	let script = ::lang::script::Script { code: code };
+	
+	let locals = Vec::from_elem( script.code.n_local_variables, value::Nothing );
+	let shared = Vec::from_fn( script.code.n_shared_local_variables, |_| { Rc::new( value::Nothing ) } );
+	
+	Ok( frame::Frame {
+		type_: frame::Main( script ),
+		local_variables: locals,
+		shared_local_variables: shared,
+		instruction: 0,
+	} )
 }
 
-pub fn compile_repl( repl: &mut node::Repl, repl_state: &mut repl::State ) -> Result<Code,Vec<AnalysisError>> {
+pub fn compile_repl( repl_state: &mut repl::State, source: &str ) -> Result<frame::Frame,Vec<Box<Error>>> {
+	
+	debug!( { println!( "COMPILER: Parsing..." ); } )
+	
+	let mut ast = match parser::parse_repl( source ) {
+		Ok( ast ) => ast,
+		Err( error ) => {
+			let mut errors = Vec::new();
+			errors.push( box error as Box<Error> );
+			return Err( errors );
+		}
+	};
 	
 	debug!( { println!( "COMPILER: Analyzing variables..." ); } )
 	
-	let mut pass = AnalyzeScopes::new();
-	pass.analyze_repl_root( &mut repl.root, repl_state );
+	let mut pass = AnalyzeResolution::new();
+	pass.analyze_repl_root( &mut ast.root, repl_state );
 	if pass.errors.len() > 0 {
-		return Err( pass.errors );
+		return Err( pass.errors.move_iter().map( |e| { box e as Box<Error> } ).collect() );
 	}
 	
 	debug!( { println!( "COMPILER: Determing allocation..." ); } )
 	
 	let mut pass = AnalyzeAllocation::new();
-	pass.analyze_repl_root( &mut repl.root, repl_state );
+	pass.analyze_repl_root( &mut ast.root, repl_state );
 	if pass.errors.len() > 0 {
-		return Err( pass.errors );
+		return Err( pass.errors.move_iter().map( |e| { box e as Box<Error> } ).collect() );
 	}
 	
 	debug!( { println!( "COMPILER: Compiling..." ); } )
 	
 	let code = {
 		let mut compilation = Compilation::new();
-		compilation.compile_root( &repl.root );
+		compilation.compile_root( &mut ast.root );
 		compilation.code
 	};
 	
 	debug!( { println!( "COMPILER: Done." ); code.dump(); } )
 	
-	Ok( code )
+	let script = ::lang::script::Script { code: code };
+	
+	let locals = Vec::from_elem( script.code.n_local_variables, value::Nothing );
+	let mut shared = Vec::from_fn( script.code.n_shared_local_variables, |_| { Rc::new( value::Nothing ) } );
+	
+	for variable in ast.root.frame.declared_variables.iter().take( repl_state.variables.len() ) {
+		*shared.get_mut( variable.local_storage_index ) = repl_state.variables.find( &variable.name ).unwrap().clone();
+	}
+	
+	Ok( frame::Frame {
+		type_: frame::Main( script ),
+		local_variables: locals,
+		shared_local_variables: shared,
+		instruction: 0,
+	} )
 }
 
 struct Compilation {
-	code: Code,
-	frames: Vec<Raw<FrameAnalysis>>,
+	code: Box<Code>,
+	frames: Vec<Raw<annotation::Frame>>,
 }
 
 	type Placeholder = uint;
@@ -84,7 +132,7 @@ struct Compilation {
 		
 		fn new() -> Compilation {
 			Compilation {
-				code: Code::new(),
+				code: box Code::new(),
 				frames: Vec::new(),
 			}
 		}
@@ -99,14 +147,14 @@ struct Compilation {
 			*self.code.opcodes.get_mut( offset ) = opcode;
 		}
 		
-		fn compile_root( &mut self, root: &node::Root ) {
+		fn compile_root( &mut self, root: &mut node::Root ) {
 			
 			self.frames.push( Raw::new( &root.frame ) );
 			
 			self.code.n_local_variables = root.frame.n_local_variables;
 			self.code.n_shared_local_variables = root.frame.n_shared_local_variables;
 			
-			for statement in root.statements.iter() {
+			for statement in root.statements.mut_iter() {
 				self.compile_statement( *statement );
 			}
 			self.code.opcodes.push( opcode::End );
@@ -114,14 +162,14 @@ struct Compilation {
 			self.frames.pop();
 		}
 		
-		fn compile_function( &mut self, frame: &FrameAnalysis, block: &Vec<Box<node::Statement>> ) {
+		fn compile_function( &mut self, frame: &annotation::Frame, block: &mut [Box<node::Statement>] ) {
 			
 			self.frames.push( Raw::new( frame ) );
 			
 			self.code.n_local_variables = frame.n_local_variables;
 			self.code.n_shared_local_variables = frame.n_shared_local_variables;
 			
-			for statement in block.iter() {
+			for statement in block.mut_iter() {
 				self.compile_statement( *statement );
 			}
 			
@@ -131,92 +179,105 @@ struct Compilation {
 			self.frames.pop();
 		}
 		
-		fn compile_statement( &mut self, statement: &node::Statement ) {
+		fn compile_statement( &mut self, statement: &mut node::Statement ) {
 			match *statement {
 				
+				node::Use {
+					path: ref path,
+					annotation: ref mut annotation,
+				} => {
+					let operation = box ::lang::module::Use::new( path.clone() );
+					annotation.operation = Raw::new( operation );
+					self.code.opcodes.push( opcode::Use { operation: Raw::new( operation ) } );
+					unsafe { mem::forget( operation ); }
+				}
+				
 				node::ExpressionStatement {
-					expression: ref expression,
+					expression: ref mut expression,
 				} => {
 					self.compile_expression( *expression );
 					self.code.opcodes.push( opcode::Pop );
 				}
 				
 				node::Assignment {
-					lvalue: ref lvalue,
-					rvalue: ref rvalue,
+					lvalue: ref mut lvalue,
+					rvalue: ref mut rvalue,
 				} => {
 					
-					self.compile_expression( *rvalue );
-					
 					match **lvalue {
+						
 						node::VariableLvalue {
 							name: _,
-							analysis: ref variable,
+							annotation: ref variable,
 						} => {
-							
 							let variable = variable.get();
+							
+							self.compile_expression( *rvalue );
 							
 							// TODO free variables!!
 							match variable.local_storage_type {
-								analysis::LocalStorage => {
+								annotation::LocalStorage => {
 									self.code.opcodes.push( opcode::StoreLocal { index: variable.local_storage_index } );
 								}
-								analysis::SharedLocalStorage => {
+								annotation::SharedLocalStorage => {
 									self.code.opcodes.push( opcode::StoreSharedLocal { index: variable.local_storage_index } );
 								}
 							};
 						}
+						
+						node::DotAccessLvalue {
+							expression: ref mut expression,
+							name: name,
+						} => {
+							self.compile_expression( *expression );
+							self.compile_expression( *rvalue );
+							self.code.opcodes.push( opcode::SetProperty { name: name } );
+						}
 					}
-				}
-				
-				node::Import {
-					path: _,
-				} => {
-					self.code.opcodes.push( opcode::Import { id: 0 } );
 				}
 				
 				node::Let {
 					variable_name: _,
-					variable: ref variable,
-					default: ref default,
+					annotation: ref annotation,
+					default: ref mut default,
 					source_offset: _,
 				} => {
-					let variable = variable.get();
+					let annotation = annotation.get();
 					
 					if default.is_some() {
 						
-						self.compile_expression( *default.as_ref().unwrap() );
+						self.compile_expression( *default.as_mut().unwrap() );
 						
-						match variable.local_storage_type {
-							analysis::LocalStorage => {
-								self.code.opcodes.push( opcode::StoreLocal { index: variable.local_storage_index } );
+						match annotation.local_storage_type {
+							annotation::LocalStorage => {
+								self.code.opcodes.push( opcode::StoreLocal { index: annotation.local_storage_index } );
 							}
-							analysis::SharedLocalStorage => {
-								self.code.opcodes.push( opcode::StoreSharedLocal { index: variable.local_storage_index } );
+							annotation::SharedLocalStorage => {
+								self.code.opcodes.push( opcode::StoreSharedLocal { index: annotation.local_storage_index } );
 							}
 						};
 					}
 				}
 				
 				node::Print {
-					expression: ref expression,
+					expression: ref mut expression,
 				} => {
 					self.compile_expression( *expression );
 					self.code.opcodes.push( opcode::Print );
 				}
 				
 				node::Throw {
-					expression: ref expression,
+					expression: ref mut expression,
 				} => {
 					self.compile_expression( *expression );
 					self.code.opcodes.push( opcode::Throw );
 				}
 				
 				node::If {
-					test: ref test,
-					block: ref if_block,
-					else_if_clauses: ref else_if_clauses,
-					else_clause: ref else_clause,
+					test: ref mut test,
+					block: ref mut if_block,
+					else_if_clauses: ref mut else_if_clauses,
+					else_clause: ref mut else_clause,
 				} => {
 					
 					let has_else_if_clauses = else_if_clauses.len() > 0;
@@ -228,7 +289,7 @@ struct Compilation {
 					self.compile_expression( *test );
 					jump_else = self.create_placeholder();
 					
-					for statement in if_block.iter() {
+					for statement in if_block.mut_iter() {
 						self.compile_statement( *statement );
 					}
 					
@@ -237,7 +298,7 @@ struct Compilation {
 					}
 					
 					let last_i = else_if_clauses.len() - 1;
-					for (i, else_if_clause) in else_if_clauses.iter().enumerate() {
+					for (i, else_if_clause) in else_if_clauses.mut_iter().enumerate() {
 						
 						let is_last = ( i == last_i );
 						
@@ -247,7 +308,7 @@ struct Compilation {
 						self.compile_expression( else_if_clause.test );
 						jump_else = self.create_placeholder();
 						
-						for statement in else_if_clause.block.iter() {
+						for statement in else_if_clause.block.mut_iter() {
 							self.compile_statement( *statement );
 						}
 						
@@ -260,7 +321,7 @@ struct Compilation {
 					self.fill_in_placeholder( jump_else, jump );
 					
 					if has_else_clause {
-						for statement in else_clause.as_ref().unwrap().block.iter() {
+						for statement in else_clause.as_mut().unwrap().block.mut_iter() {
 							self.compile_statement( *statement );
 						}
 					}
@@ -272,9 +333,9 @@ struct Compilation {
 				}
 				
 				node::While {
-					test: ref while_test,
-					block: ref while_block,
-					else_clause: ref else_clause,
+					test: ref mut while_test,
+					block: ref mut while_block,
+					else_clause: ref mut else_clause,
 				} => {
 					
 					let start = self.code.opcodes.len();
@@ -282,7 +343,7 @@ struct Compilation {
 					self.compile_expression( *while_test );
 					let test_opcode = self.create_placeholder();
 					
-					for statement in while_block.iter() {
+					for statement in while_block.mut_iter() {
 						self.compile_statement( *statement );
 					}
 					
@@ -295,10 +356,10 @@ struct Compilation {
 				}
 				
 				node::Try {
-					block: ref try_block,
-					catch_clauses: ref catch_clauses,
-					else_clause: ref else_clause,
-					finally_clause: ref finally_clause,
+					block: ref mut try_block,
+					catch_clauses: ref mut catch_clauses,
+					else_clause: ref mut else_clause,
+					finally_clause: ref mut finally_clause,
 				} => {
 					
 					let has_catch_clauses = catch_clauses.len() > 0;
@@ -319,7 +380,7 @@ struct Compilation {
 						None
 					};
 					
-					for statement in try_block.iter() {
+					for statement in try_block.mut_iter() {
 						self.compile_statement( *statement );
 					}
 					
@@ -334,17 +395,17 @@ struct Compilation {
 						let opcode = opcode::PushStartCatchFlowPoint { instruction: self.code.opcodes.len() };
 						self.fill_in_placeholder( push_catch.unwrap(), opcode );
 						
-						for catch_clause in catch_clauses.iter() {
+						for catch_clause in catch_clauses.mut_iter() {
 							
 							let has_type = catch_clause.type_.is_some();
 							
 							if has_type {
-								self.compile_expression( *catch_clause.type_.as_ref().unwrap() );
+								self.compile_expression( *catch_clause.type_.as_mut().unwrap() );
 							}
 							
 							let catch = self.create_placeholder();
 							
-							for statement in catch_clause.block.iter() {
+							for statement in catch_clause.block.mut_iter() {
 								self.compile_statement( *statement );
 							}
 							
@@ -366,7 +427,7 @@ struct Compilation {
 					
 					if has_else_clause {
 						
-						for statement in else_clause.as_ref().unwrap().block.iter() {
+						for statement in else_clause.as_mut().unwrap().block.mut_iter() {
 							self.compile_statement( *statement );
 						}
 					}
@@ -383,7 +444,7 @@ struct Compilation {
 						let opcode = opcode::PushStartFinallyFlowPoint { instruction: self.code.opcodes.len() };
 						self.fill_in_placeholder( push_finally.unwrap(), opcode );
 						
-						for statement in finally_clause.as_ref().unwrap().block.iter() {
+						for statement in finally_clause.as_mut().unwrap().block.mut_iter() {
 							self.compile_statement( *statement );
 						}
 						
@@ -395,7 +456,7 @@ struct Compilation {
 			}
 		}
 		
-		fn compile_expression( &mut self, expression: &node::Expression ) {
+		fn compile_expression( &mut self, expression: &mut node::Expression ) {
 			match *expression {
 				
 				node::Nothing => {
@@ -429,7 +490,7 @@ struct Compilation {
 				
 				node::Variable {
 					name: _,
-					analysis: ref variable,
+					annotation: ref variable,
 					source_offset: _,
 				} => {
 					
@@ -439,10 +500,10 @@ struct Compilation {
 					if current_frame.closure.is_none() || variable.declared_in.get() == current_frame {
 						
 						match variable.local_storage_type {
-							analysis::LocalStorage => {
+							annotation::LocalStorage => {
 								self.code.opcodes.push( opcode::LoadLocal { index: variable.local_storage_index } );
 							}
-							analysis::SharedLocalStorage => {
+							annotation::SharedLocalStorage => {
 								self.code.opcodes.push( opcode::LoadSharedLocal { index: variable.local_storage_index } );
 							}
 						}
@@ -453,10 +514,10 @@ struct Compilation {
 							if binding.variable.get() == variable {
 								
 								match variable.bound_storage_type {
-									analysis::StaticBoundStorage => {
+									annotation::StaticBoundStorage => {
 										self.code.opcodes.push( opcode::LoadStaticBound { index: binding.storage_index } );
 									}
-									analysis::SharedBoundStorage => {
+									annotation::SharedBoundStorage => {
 										self.code.opcodes.push( opcode::LoadSharedBound { index: binding.storage_index } );
 									}
 								}
@@ -469,19 +530,35 @@ struct Compilation {
 				
 				node::Name {
 					identifier: identifier,
+					annotation: ref annotation,
 				} => {
-					// TODO
-					self.code.opcodes.push( opcode::LoadImplicit { name: identifier } );
+					match annotation.resolution {
+						annotation::Implicit => {
+							self.code.opcodes.push( opcode::LoadImplicit { name: identifier } );
+						}
+						annotation::Use( use_annotation ) => {
+							use_annotation.get().operation.get().add_inline( Raw::new( self.code ), self.code.opcodes.len() );
+							self.code.opcodes.push( opcode::Nop ); // TODO Fail opcode
+						}
+					};
+				}
+				
+				node::DotAccess {
+					expression: ref mut expression,
+					name: name,
+				} => {
+					self.compile_expression( *expression );
+					self.code.opcodes.push( opcode::GetProperty { name: name } );
 				}
 				
 				node::Call {
-					expression: ref expression,
-					arguments: ref arguments,
+					expression: ref mut expression,
+					arguments: ref mut arguments,
 				} => {
 					
 					self.compile_expression( *expression );
 					
-					for argument in arguments.iter() {
+					for argument in arguments.mut_iter() {
 						self.compile_expression( *argument );
 					}
 					
@@ -489,8 +566,8 @@ struct Compilation {
 				}
 				
 				node::Addition {
-					left: ref left,
-					right: ref right,
+					left: ref mut left,
+					right: ref mut right,
 				} => {
 					self.compile_expression( *left );
 					self.compile_expression( *right );
@@ -498,8 +575,8 @@ struct Compilation {
 				}
 				
 				node::Subtraction {
-					left: ref left,
-					right: ref right,
+					left: ref mut left,
+					right: ref mut right,
 				} => {
 					self.compile_expression( *left );
 					self.compile_expression( *right );
@@ -507,8 +584,8 @@ struct Compilation {
 				}
 				
 				node::Union {
-					left: ref left,
-					right: ref right,
+					left: ref mut left,
+					right: ref mut right,
 				} => {
 					self.compile_expression( *left );
 					self.compile_expression( *right );
@@ -516,8 +593,8 @@ struct Compilation {
 				}
 				
 				node::Is {
-					left: ref left,
-					right: ref right,
+					left: ref mut left,
+					right: ref mut right,
 				} => {
 					self.compile_expression( *left );
 					self.compile_expression( *right );
@@ -525,8 +602,8 @@ struct Compilation {
 				}
 				
 				node::Eq {
-					left: ref left,
-					right: ref right,
+					left: ref mut left,
+					right: ref mut right,
 				} => {
 					self.compile_expression( *left );
 					self.compile_expression( *right );
@@ -534,8 +611,8 @@ struct Compilation {
 				}
 				
 				node::Neq {
-					left: ref left,
-					right: ref right,
+					left: ref mut left,
+					right: ref mut right,
 				} => {
 					self.compile_expression( *left );
 					self.compile_expression( *right );
@@ -543,8 +620,8 @@ struct Compilation {
 				}
 				
 				node::Lt {
-					left: ref left,
-					right: ref right,
+					left: ref mut left,
+					right: ref mut right,
 				} => {
 					self.compile_expression( *left );
 					self.compile_expression( *right );
@@ -552,8 +629,8 @@ struct Compilation {
 				}
 				
 				node::Gt {
-					left: ref left,
-					right: ref right,
+					left: ref mut left,
+					right: ref mut right,
 				} => {
 					self.compile_expression( *left );
 					self.compile_expression( *right );
@@ -561,8 +638,8 @@ struct Compilation {
 				}
 				
 				node::LtEq {
-					left: ref left,
-					right: ref right,
+					left: ref mut left,
+					right: ref mut right,
 				} => {
 					self.compile_expression( *left );
 					self.compile_expression( *right );
@@ -570,8 +647,8 @@ struct Compilation {
 				}
 				
 				node::GtEq {
-					left: ref left,
-					right: ref right,
+					left: ref mut left,
+					right: ref mut right,
 				} => {
 					self.compile_expression( *left );
 					self.compile_expression( *right );
@@ -581,11 +658,11 @@ struct Compilation {
 				node::Function {
 					parameters: _,
 					frame: ref frame,
-					block: ref block,
+					block: ref mut block,
 				} => {
 					
 					let mut compilation = Compilation::new();
-					compilation.compile_function( frame, block );
+					compilation.compile_function( frame, block.as_mut_slice() );
 					let code = compilation.code;
 					
 					let definition = Rc::new( FunctionDefinition::new( Vec::new(), code ) );

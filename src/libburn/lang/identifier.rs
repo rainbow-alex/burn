@@ -5,7 +5,7 @@ use std::fmt;
 use collections::HashMap;
 use mem::raw::Raw;
 
-static mut ALL: Raw<HashMap<String,Box<IdentifierContainer>>> = Raw { ptr: 0 as *_ };
+static mut ALL: Raw<HashMap<String,Box<IdentifierContainer>>> = Raw { ptr: 0 as *mut _ };
 
 struct IdentifierContainer {
 	value: String,

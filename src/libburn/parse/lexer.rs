@@ -164,13 +164,11 @@ impl<'src> Lexer<'src> {
 					"catch" => token::Catch,
 					"class" => token::Class,
 					"else" => token::Else,
-					"extends" => token::Extends,
 					"false" => token::False,
 					"finally" => token::Finally,
 					"for" => token::For,
 					"function" => token::Function,
 					"if" => token::If,
-					"import" => token::Import,
 					"in" => token::In,
 					"is" => token::Is,
 					"let" => token::Let,
@@ -185,6 +183,7 @@ impl<'src> Lexer<'src> {
 					"true" => token::True,
 					"try" => token::Try,
 					"while" => token::While,
+					"use" => token::Use,
 					_ => token::Identifier( sub ),
 				};
 				
@@ -202,8 +201,7 @@ impl<'src> Lexer<'src> {
 						| Some( 'A'..'Z' )
 						| Some( '0'..'9' )
 						| Some( '_' )
-						| Some( ':' )
-						| Some( '!' ) => { length += 1; },
+						| Some( ':' ) => { length += 1; },
 						_ => { break; }
 					}
 				}
@@ -393,7 +391,6 @@ mod test {
 		assert!( lex( "catch" ) == vec!( token::Catch ) );
 		assert!( lex( "class" ) == vec!( token::Class ) );
 		assert!( lex( "else" ) == vec!( token::Else ) );
-		assert!( lex( "extends" ) == vec!( token::Extends ) );
 		assert!( lex( "false" ) == vec!( token::False ) );
 		assert!( lex( "finally" ) == vec!( token::Finally ) );
 		assert!( lex( "for" ) == vec!( token::For ) );
@@ -412,6 +409,7 @@ mod test {
 		assert!( lex( "true" ) == vec!( token::True ) );
 		assert!( lex( "try" ) == vec!( token::Try ) );
 		assert!( lex( "while" ) == vec!( token::While ) );
+		assert!( lex( "use" ) == vec!( token::Use ) );
 	}
 	
 	#[test]

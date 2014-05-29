@@ -5,7 +5,7 @@ use mem::raw::Raw;
 use lang::type_::{TypeUnion, TypeIntersection};
 use lang::module::Module;
 use lang::special::{StaticSpecial, RcSpecial};
-use builtin::burn::operations;
+use lang::operations;
 
 #[deriving(Clone)]
 pub enum Value {

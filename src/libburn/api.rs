@@ -17,7 +17,7 @@ pub mod mem {
 pub mod vm {
 	pub use vm::error::Error;
 	pub use vm::virtual_machine::VirtualMachine;
-	pub use vm::virtual_machine::result;
+	pub use vm::result;
 }
 
 pub mod repl {

@@ -36,14 +36,14 @@ pub struct Function {
 
 pub struct FunctionDefinition {
 	pub parameters: Vec<FunctionParameterDefinition>,
-	pub code: Code,
+	pub code: Box<Code>,
 	pub n_static_bound_variables: uint,
 	pub n_shared_bound_variables: uint,
 }
 
 	impl FunctionDefinition {
 		
-		pub fn new( parameters: Vec<FunctionParameterDefinition>, code: Code ) -> FunctionDefinition {
+		pub fn new( parameters: Vec<FunctionParameterDefinition>, code: Box<Code> ) -> FunctionDefinition {
 			FunctionDefinition {
 				parameters: parameters,
 				code: code,

@@ -1,33 +1,26 @@
-use vm::error::AnalysisError;
-use vm::analysis::{
-	FrameAnalysis,
-	VariableAnalysis,
-	ReadVariable,
-	WriteVariable,
-	BindVariable,
-	Binding,
-	Time,
-};
-use parse::node;
 use mem::raw::Raw;
 use lang::identifier::Identifier;
+use parse::node;
+use vm::error::AnalysisError;
+use vm::analysis::annotation;
 use vm::repl;
 
 struct Scope {
-	declared: Vec<Raw<VariableAnalysis>>,
+	declared_variables: Vec<Raw<annotation::Variable>>,
+	used: Vec<Raw<annotation::Use>>,
 }
 
-pub struct AnalyzeScopes {
-	frames: Vec<Raw<FrameAnalysis>>,
+pub struct AnalyzeResolution {
+	frames: Vec<Raw<annotation::Frame>>,
 	scopes: Vec<Scope>,
-	time: Time,
+	time: annotation::Time,
 	pub errors: Vec<AnalysisError>,
 }
 
-	impl AnalyzeScopes {
+	impl AnalyzeResolution {
 		
-		pub fn new() -> AnalyzeScopes {
-			AnalyzeScopes {
+		pub fn new() -> AnalyzeResolution {
+			AnalyzeResolution {
 				frames: Vec::new(),
 				scopes: Vec::new(),
 				time: 0,
@@ -36,13 +29,13 @@ pub struct AnalyzeScopes {
 		}
 		
 		#[inline(always)]
-		fn tick( &mut self ) -> Time {
+		fn tick( &mut self ) -> annotation::Time {
 			self.time += 1;
 			self.time
 		}
 		
 		#[inline(always)]
-		fn push_frame( &mut self, frame: &mut FrameAnalysis ) {
+		fn push_frame( &mut self, frame: &mut annotation::Frame ) {
 			self.frames.push( Raw::new( frame ) );
 		}
 		
@@ -54,7 +47,8 @@ pub struct AnalyzeScopes {
 		#[inline(always)]
 		fn push_scope( &mut self ) {
 			self.scopes.push( Scope {
-				declared: Vec::new(),
+				declared_variables: Vec::new(),
+				used: Vec::new(),
 			} );
 		}
 		
@@ -68,17 +62,30 @@ pub struct AnalyzeScopes {
 			self.scopes.mut_last().unwrap()
 		}
 		
-		fn find_variable( &mut self, name: Identifier ) -> Result<Raw<VariableAnalysis>,()> {
+		fn find_variable( &mut self, name: Identifier ) -> Result<Raw<annotation::Variable>,()> {
 			
 			for scope in self.scopes.iter().rev() {
-				for &variable in scope.declared.iter() {
+				for &variable in scope.declared_variables.iter() {
 					if variable.get().name == name {
 						return Ok( variable );
 					}
 				}
 			}
 			
-			Err(())
+			Err( () )
+		}
+		
+		fn find_name( &mut self, name: Identifier ) -> annotation::NameResolution {
+			
+			for scope in self.scopes.iter().rev() {
+				for &use_ in scope.used.iter() {
+					if use_.get().name == name {
+						return annotation::Use( use_ );
+					}
+				}
+			}
+			
+			annotation::Implicit
 		}
 		
 		pub fn analyze_root( &mut self, root: &mut node::Root ) {
@@ -97,17 +104,17 @@ pub struct AnalyzeScopes {
 			
 			// put repl_state vars into the root scope
 			for &name in repl_state.variables.keys() {
-				let mut var = box VariableAnalysis::new( name );
+				let mut var = box annotation::Variable::new( name );
 				var.declared_in = Raw::new( &root.frame );
-				self.get_current_scope().declared.push( Raw::new( var ) );
-				root.frame.declared.push( var );
+				self.get_current_scope().declared_variables.push( Raw::new( var ) );
+				root.frame.declared_variables.push( var );
 			}
 			
 			self.find_declarations_in_block( &mut root.statements );
 			self.analyze_block( &mut root.statements );
 			
 			// put any new vars into repl_state
-			for var in self.get_current_scope().declared.iter().skip( repl_state.variables.len() ) {
+			for var in self.get_current_scope().declared_variables.iter().skip( repl_state.variables.len() ) {
 				repl_state.declare_variable( var.get().name );
 			}
 			
@@ -126,28 +133,28 @@ pub struct AnalyzeScopes {
 				
 				node::Let {
 					variable_name: name,
-					variable: ref mut let_variable,
+					annotation: ref mut annotation,
 					default: _,
 					source_offset: _,
 				} => {
 					
 					let current_scope = self.scopes.mut_last().unwrap();
 					
-					for variable in current_scope.declared.iter() {
+					for variable in current_scope.declared_variables.iter() {
 						if name == variable.get().name {
 							fail!( "Double declaration" ); // TODO
 						}
 					}
 					
-					let mut variable = box VariableAnalysis::new( name );
+					let mut variable = box annotation::Variable::new( name );
 					
-					*let_variable = Raw::new( variable );
+					*annotation = Raw::new( variable );
 					
-					current_scope.declared.push( Raw::new( variable ) );
+					current_scope.declared_variables.push( Raw::new( variable ) );
 					
 					let current_frame = self.frames.mut_last().unwrap().get();
 					variable.declared_in = Raw::new( current_frame );
-					current_frame.declared.push( variable );
+					current_frame.declared_variables.push( variable );
 				}
 				
 				_ => {}
@@ -163,13 +170,19 @@ pub struct AnalyzeScopes {
 		fn analyze_statement( &mut self, statement: &mut node::Statement ) {
 			match *statement {
 				
+				node::Use {
+					path: _,
+					annotation: ref mut annotation,
+				} => {
+					// TODO check for double name
+					self.scopes.mut_last().unwrap().used.push( Raw::new( annotation ) );
+				}
+				
 				node::ExpressionStatement { expression: ref mut expression }
 				| node::Print { expression: ref mut expression }
 				=> {
 					self.analyze_expression( *expression );
 				}
-				
-				node::Import {..} => {}
 				
 				node::Return { expression: ref mut optional_expression }
 				=> {
@@ -183,14 +196,14 @@ pub struct AnalyzeScopes {
 				
 				node::Let {
 					variable_name: _,
-					variable: ref mut variable,
+					annotation: ref mut annotation,
 					default: ref mut default,
 					source_offset: _,
 				} => {
 					match *default {
 						Some( ref mut expression ) => {
 							self.analyze_expression( *expression );
-							self.write_variable( variable.get() );
+							self.write_variable( annotation.get() );
 						}
 						None => {}
 					};
@@ -283,12 +296,12 @@ pub struct AnalyzeScopes {
 						
 						self.push_scope();
 						
-						let mut variable = box VariableAnalysis::new( catch_clause.variable_name );
+						let mut variable = box annotation::Variable::new( catch_clause.variable_name );
 						variable.declared_in = *self.frames.last().unwrap();
 						
 						catch_clause.variable = Raw::new( variable );
-						self.scopes.mut_last().unwrap().declared.push( Raw::new( variable ) );
-						self.frames.mut_last().unwrap().get().declared.push( variable );
+						self.scopes.mut_last().unwrap().declared_variables.push( Raw::new( variable ) );
+						self.frames.mut_last().unwrap().get().declared_variables.push( variable );
 						
 						self.find_declarations_in_block( &mut catch_clause.block );
 						self.analyze_block( &mut catch_clause.block );
@@ -333,13 +346,13 @@ pub struct AnalyzeScopes {
 				
 				node::Variable {
 					name: name,
-					analysis: ref mut analysis,
+					annotation: ref mut annotation,
 					source_offset: source_offset,
 				} => {
 					match self.find_variable( name ) {
-						Ok( variable_analysis ) => {
-							*analysis = variable_analysis;
-							self.read_variable( variable_analysis.get() );
+						Ok( variable ) => {
+							*annotation = variable;
+							self.read_variable( variable.get() );
 						}
 						Err(..) => {
 							self.errors.push( AnalysisError {
@@ -350,7 +363,12 @@ pub struct AnalyzeScopes {
 					};
 				}
 				
-				node::Name {..} => {}
+				node::Name {
+					identifier: identifier,
+					annotation: ref mut annotation,
+				} => {
+					annotation.resolution = self.find_name( identifier );
+				}
 				
 				node::ItemAccess {
 					expression: ref mut expression,
@@ -439,11 +457,11 @@ pub struct AnalyzeScopes {
 				
 				node::VariableLvalue {
 					name: name,
-					analysis: ref mut analysis,
+					annotation: ref mut annotation,
 				} => {
 					match self.find_variable( name ) {
-						Ok( variable_analysis ) => {
-							*analysis = variable_analysis;
+						Ok( variable ) => {
+							*annotation = variable;
 						}
 						Err(..) => {
 							self.errors.push( AnalysisError {
@@ -453,6 +471,13 @@ pub struct AnalyzeScopes {
 						}
 					}
 				}
+				
+				node::DotAccessLvalue {
+					expression: ref mut expression,
+					name: _,
+				} => {
+					self.analyze_expression( *expression );
+				}
 			}
 		}
 		
@@ -461,30 +486,32 @@ pub struct AnalyzeScopes {
 				
 				node::VariableLvalue {
 					name: _,
-					analysis: ref mut analysis,
+					annotation: ref mut annotation,
 				} => {
-					self.write_variable( analysis.get() );
+					self.write_variable( annotation.get() );
 				}
+				
+				node::DotAccessLvalue {..} => {}
 			}
 		}
 		
-		fn read_variable( &mut self, variable: &mut VariableAnalysis ) {
+		fn read_variable( &mut self, variable: &mut annotation::Variable ) {
 			if self.frames.last().unwrap().get() == variable.declared_in.get() {
-				variable.reads.push( ReadVariable { time: self.tick() } );
+				variable.reads.push( annotation::ReadVariable { time: self.tick() } );
 			} else {
 				self.bind_variable( variable, false );
 			}
 		}
 		
-		fn write_variable( &mut self, variable: &mut VariableAnalysis ) {
+		fn write_variable( &mut self, variable: &mut annotation::Variable ) {
 			if self.frames.last().unwrap().get() == variable.declared_in.get() {
-				variable.writes.push( WriteVariable { time: self.tick() } );
+				variable.writes.push( annotation::WriteVariable { time: self.tick() } );
 			} else {
 				self.bind_variable( variable, true );
 			}
 		}
 		
-		fn bind_variable( &mut self, variable: &mut VariableAnalysis, mutable: bool ) {
+		fn bind_variable( &mut self, variable: &mut annotation::Variable, mutable: bool ) {
 			
 			let mut time = 0;
 			
@@ -512,7 +539,7 @@ pub struct AnalyzeScopes {
 					}
 				}
 				
-				closure.bindings.push( Binding {
+				closure.bindings.push( annotation::Binding {
 					variable: Raw::new( variable ),
 					mutable: mutable,
 					storage_index: 0,
@@ -527,7 +554,7 @@ pub struct AnalyzeScopes {
 				}
 			}
 			
-			variable.root_binds.push( BindVariable {
+			variable.root_binds.push( annotation::BindVariable {
 				time: time,
 				mutable: mutable,
 			} );

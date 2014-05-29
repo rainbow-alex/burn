@@ -1,3 +1,4 @@
+use mem::raw::Raw;
 use lang::identifier::Identifier;
 
 #[deriving(Show)]
@@ -36,6 +37,9 @@ pub enum OpCode {
 	EndFinally,
 	
 	// Data stack operations
+	Pop,
+	
+	// Values
 	PushFunction { pub index: uint },
 	//PushBoundBurnFunction { pub index: uint },
 	PushString { pub index: uint },
@@ -43,7 +47,7 @@ pub enum OpCode {
 	PushInteger { pub value: i64 },
 	PushBoolean { pub value: bool },
 	PushNothing,
-	Pop,
+	InlinedModule { pub ptr: Raw<::lang::module::Module> },
 	
 	// Variables
 	StoreLocal { pub index: uint },
@@ -56,8 +60,12 @@ pub enum OpCode {
 	LoadSharedBound { pub index: uint },
 	
 	// Names
-	Import { pub id: uint },
+	Use { pub operation: Raw<::lang::module::Use> },
 	LoadImplicit { pub name: Identifier },
+	
+	// Access
+	GetProperty { pub name: Identifier },
+	SetProperty { pub name: Identifier },
 	
 	// Operations
 	Is,

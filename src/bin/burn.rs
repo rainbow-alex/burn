@@ -104,18 +104,14 @@ fn process_input( input: Input, args: Vec<String> ) {
 	
 	match result {
 		
-		result::End => {
+		result::Done => {
 		}
 		
-		result::Errors( errors ) => {
+		result::Fail( errors ) => {
 			for error in errors.iter() {
 				let _ = writeln!( io::stderr(), "{}", error.get_message() );
 				os::set_exit_status( 2 );
 			}
-		}
-		
-		result::Value(..) => {
-			fail!();
 		}
 		
 		result::UncaughtThrowable( t ) => {
@@ -155,17 +151,13 @@ fn repl() {
 		
 		match result {
 			
-			result::End => {
+			result::Done => {
 			}
 			
-			result::Errors( errors ) => {
+			result::Fail( errors ) => {
 				for error in errors.iter() {
 					let _ = writeln!( io::stderr(), "{}", error.get_message() );
 				}
-			}
-			
-			result::Value(..) => {
-				fail!();
 			}
 			
 			result::UncaughtThrowable( t ) => {

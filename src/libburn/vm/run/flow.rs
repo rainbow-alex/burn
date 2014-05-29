@@ -1,5 +1,6 @@
 use lang::value;
 
+#[deriving(Clone)]
 pub enum Flow {
 	Running,
 	Catching( value::Value ),
@@ -11,6 +12,6 @@ pub enum Flow {
 pub enum FlowPoint {
 	StartCatch { pub instruction: uint },
 	StartFinally { pub instruction: uint },
-	PopFrame,
+	PopFrame { pub data_stack_len: uint },
 	PopSuppressedFlow,
 }

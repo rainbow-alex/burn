@@ -3,7 +3,7 @@
 #![feature(macro_rules, struct_variant, globs)]
 #![allow(unnecessary_parens)]
 
-// this lint is a but bugged
+// this lint is a bit bugged
 // https://github.com/mozilla/rust/pull/14413
 #![allow(visible_private_types)]
 
@@ -42,6 +42,8 @@ mod lang {
 	pub mod special;
 	
 	pub mod value;
+	
+	pub mod operations;
 }
 
 mod mem {
@@ -52,7 +54,13 @@ mod mem {
 
 mod vm {
 	
-	pub mod analysis;
+	pub mod analysis {
+		
+		pub mod annotation;
+		
+		pub mod resolution;
+		pub mod allocation;
+	}
 	
 	pub mod bytecode {
 		pub mod code;
@@ -60,16 +68,24 @@ mod vm {
 		pub mod compiler;
 	}
 	
-	pub mod virtual_machine;
+	pub mod run {
+		pub mod fiber;
+		pub mod flow;
+		pub mod frame;
+		pub mod rust;
+		pub mod cpu;
+	}
 	
+	pub mod virtual_machine;
+	pub mod result;
 	pub mod error;
+	
 	pub mod repl;
 }
 
 mod builtin {
 	pub mod burn {
 		pub mod implicit;
-		pub mod operations;
 		pub mod errors;
 		pub mod types;
 	}

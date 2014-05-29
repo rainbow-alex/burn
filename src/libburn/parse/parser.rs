@@ -4,7 +4,7 @@ use parse::token;
 use parse::lexer::Lexer;
 use parse::node;
 use parse::literal;
-use vm::analysis::FrameAnalysis;
+use vm::analysis::annotation;
 use mem::raw::Raw;
 use lang::identifier::Identifier;
 
@@ -172,7 +172,7 @@ struct Parsing<'src> {
 			
 			Ok( node::Root {
 				statements: statements,
-				frame: FrameAnalysis::new(),
+				frame: annotation::Frame::new(),
 			} )
 		}
 		
@@ -215,7 +215,8 @@ struct Parsing<'src> {
 		fn parse_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
 			match self.peek() {
 				
-				token::Import => self.parse_import_statement(),
+				token::Use => self.parse_use_statement(),
+				
 				token::Let => self.parse_let_statement(),
 				token::Print => self.parse_print_statement(),
 				token::Throw => self.parse_throw_statement(),
@@ -249,10 +250,21 @@ struct Parsing<'src> {
 			}
 		}
 		
-		fn parse_import_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
+		fn parse_use_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
 			
 			let keyword = self.read();
-			assert!( keyword == token::Import );
+			assert!( keyword == token::Use );
+			
+			let path = unwrap_or_return_err!( self.parse_path() );
+			let name = *path.last().unwrap();
+			
+			Ok( box node::Use {
+				path: path,
+				annotation: annotation::Use::new( name ),
+			} )
+		}
+		
+		fn parse_path( &mut self ) -> ParseResult<Vec<Identifier>> {
 			
 			let mut path = Vec::new();
 			
@@ -280,9 +292,7 @@ struct Parsing<'src> {
 				}
 			}
 			
-			Ok( box node::Import {
-				path: path,
-			} )
+			Ok( path )
 		}
 		
 		fn parse_if_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
@@ -465,7 +475,7 @@ struct Parsing<'src> {
 			
 			Ok( box node::Let {
 				variable_name: variable_name,
-				variable: Raw::null(),
+				annotation: Raw::null(),
 				default: default,
 				source_offset: source_offset,
 			} )
@@ -663,6 +673,23 @@ struct Parsing<'src> {
 			loop {
 				match self.peek() {
 					
+					token::Dot => {
+						self.read();
+						
+						let name = match self.peek() {
+							token::Identifier( identifier ) => {
+								self.read();
+								identifier
+							}
+							_ => { fail!(); } // TODO
+						};
+						
+						expression = box node::DotAccess {
+							expression: expression,
+							name: Identifier::find_or_create( name ),
+						};
+					}
+					
 					token::LeftParenthesis => {
 						self.read();
 						self.read(); //TODO!
@@ -707,7 +734,10 @@ struct Parsing<'src> {
 				
 				token::Identifier( identifier ) => {
 					self.read();
-					Ok( box node::Name { identifier: Identifier::find_or_create( identifier ) } )
+					Ok( box node::Name {
+						identifier: Identifier::find_or_create( identifier ),
+						annotation: annotation::Name::new(),
+					} )
 				}
 				token::Variable( name ) => {
 					let source_offset = self.lexer.offset;
@@ -715,7 +745,7 @@ struct Parsing<'src> {
 					Ok( box node::Variable {
 						name: Identifier::find_or_create( name ),
 						source_offset: source_offset,
-						analysis: Raw::null(),
+						annotation: Raw::null(),
 					} )
 				}
 				
@@ -786,7 +816,7 @@ struct Parsing<'src> {
 			Ok( box node::Function {
 				parameters: parameters,
 				block: block,
-				frame: FrameAnalysis::new_with_closure(),
+				frame: annotation::Frame::new_with_closure(),
 			} )
 		}
 		
@@ -846,12 +876,22 @@ struct Parsing<'src> {
 				
 				node::Variable {
 					name: name,
-					analysis: analysis,
+					annotation: annotation,
 					source_offset: _,
 				} => {
 					Ok( box node::VariableLvalue {
 						name: name,
-						analysis: analysis,
+						annotation: annotation,
+					} )
+				}
+				
+				node::DotAccess {
+					expression: expression,
+					name: name,
+				} => {
+					Ok( box node::DotAccessLvalue {
+						expression: expression,
+						name: name,
 					} )
 				}
 				

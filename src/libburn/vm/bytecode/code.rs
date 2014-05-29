@@ -43,3 +43,19 @@ pub struct Code {
 			println!( "{}\\}", indent );
 		}
 	}
+	
+	#[unsafe_destructor]
+	impl Drop for Code {
+		fn drop( &mut self ) {
+			for c in self.opcodes.iter() {
+				match *c {
+					
+					opcode::Use { operation: operation } => {
+						unsafe { drop( operation.get_box() ); }
+					}
+					
+					_ => {}
+				}
+			}
+		}
+	}

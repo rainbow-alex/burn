@@ -1,7 +1,7 @@
 use std::vec::Vec;
-use vm::analysis::{FrameAnalysis, VariableAnalysis};
 use mem::raw::Raw;
 use lang::identifier::Identifier;
+use vm::analysis::annotation;
 
 pub struct Script {
 	pub root: Root,
@@ -13,12 +13,22 @@ pub struct Repl {
 
 pub struct Root {
 	pub statements: Vec<Box<Statement>>,
-	pub frame: FrameAnalysis,
+	pub frame: annotation::Frame,
 }
 
 // STATEMENTS //////////////////////////////////////////////////////////////////////////////////////
 
 pub enum Statement {
+	
+	Use {
+		pub path: Vec<Identifier>,
+		pub annotation: annotation::Use,
+	},
+	
+	Export {
+		pub path: Vec<Identifier>,
+		pub expression: Box<Expression>,
+	},
 	
 	ExpressionStatement {
 		pub expression: Box<Expression>,
@@ -29,13 +39,9 @@ pub enum Statement {
 		pub rvalue: Box<Expression>,
 	},
 	
-	Import {
-		pub path: Vec<Identifier>,
-	},
-	
 	Let {
 		pub variable_name: Identifier,
-		pub variable: Raw<VariableAnalysis>,
+		pub annotation: Raw<annotation::Variable>,
 		pub default: Option<Box<Expression>>,
 		pub source_offset: uint,
 	},
@@ -85,7 +91,7 @@ pub struct Else {
 pub struct Catch {
 	pub type_: Option<Box<Expression>>,
 	pub variable_name: Identifier,
-	pub variable: Raw<VariableAnalysis>,
+	pub variable: Raw<annotation::Variable>,
 	pub block: Vec<Box<Statement>>,
 }
 
@@ -99,7 +105,7 @@ pub enum Expression {
 	
 	Function {
 		pub parameters: Vec<FunctionParameter>,
-		pub frame: FrameAnalysis,
+		pub frame: annotation::Frame,
 		pub block: Vec<Box<Statement>>,
 	},
 	
@@ -170,10 +176,12 @@ pub enum Expression {
 		pub expression: Box<Expression>,
 		pub name: Identifier,
 	},
+	
 	ItemAccess {
 		pub expression: Box<Expression>,
 		pub key_expression: Box<Expression>,
 	},
+	
 	Call {
 		pub expression: Box<Expression>,
 		pub arguments: Vec<Box<Expression>>,
@@ -181,11 +189,13 @@ pub enum Expression {
 	
 	Variable {
 		pub name: Identifier,
-		pub analysis: Raw<VariableAnalysis>,
+		pub annotation: Raw<annotation::Variable>,
 		pub source_offset: uint,
 	},
+	
 	Name {
 		pub identifier: Identifier,
+		pub annotation: annotation::Name,
 	},
 	
 	String {
@@ -207,7 +217,7 @@ pub struct FunctionParameter {
 	pub type_: Option<Box<Expression>>,
 	pub default: Option<Box<Expression>>,
 	pub variable_name: Identifier,
-	pub variable: Raw<VariableAnalysis>,
+	pub variable: Raw<annotation::Variable>,
 }
 
 // LVALUES /////////////////////////////////////////////////////////////////////////////////////////
@@ -216,6 +226,11 @@ pub enum Lvalue {
 	
 	VariableLvalue {
 		pub name: Identifier,
-		pub analysis: Raw<VariableAnalysis>,
-	}
+		pub annotation: Raw<annotation::Variable>,
+	},
+	
+	DotAccessLvalue {
+		pub expression: Box<Expression>,
+		pub name: Identifier,
+	},
 }

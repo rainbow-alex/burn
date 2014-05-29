@@ -1,3 +1,4 @@
+use lang::identifier::Identifier;
 use lang::value;
 use builtin::burn::implicit;
 use builtin::burn::errors::create_type_error;
@@ -174,4 +175,14 @@ pub fn lt_eq( left: &value::Value, right: &value::Value ) -> Result<bool,value::
 
 pub fn gt_eq( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
 	return Err( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+}
+
+pub fn get_property( accessed: &value::Value, name: Identifier ) -> Result<value::Value, value::Value> {
+	(accessed); (name);
+	Ok( value::Nothing ) // TODO
+}
+
+pub fn set_property( accessed: &value::Value, name: Identifier, value: &value::Value ) -> Result<(), value::Value> {
+	(accessed); (name); (value);
+	Ok( () ) // TODO
 }

@@ -1,0 +1,8 @@
+{
+	"description": "Dummy module for testing purposes",
+	"version": "0.0",
+	
+	"load": [
+		"src/example.burn"
+	]
+}
