@@ -103,10 +103,6 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						}
 					}
 					
-					opcode::ReturnPop => {
-						fail!(); // TODO remove this opcode
-					}
-					
 					// Flow
 					
 					opcode::PopFlowPoint => {

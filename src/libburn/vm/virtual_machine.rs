@@ -41,7 +41,7 @@ pub struct VirtualMachine {
 			
 			VirtualMachine {
 				functions: GarbageCollectedManager::new(),
-				import_paths: vec!( Path::new( "/home/alex/burn/modules/" ) ), // TODO
+				import_paths: vec!( Path::new( "modules/" ) ), // TODO
 				module_root: root,
 				implicit: implicit_ref,
 				//implicit: Raw::new( root.get( "burn" ).get( "implicit" ) ),

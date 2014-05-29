@@ -200,7 +200,7 @@ struct Parsing<'src> {
 				match self.peek() {
 					token::Newline => self.skip_newlines(),
 					token::RightCurlyBracket => break,
-					_ => return Err( self.err( "Expected newline.".to_owned() ) )
+					_ => return Err( self.err( "Expected newline.".to_string() ) )
 				}
 			}
 			
@@ -404,7 +404,7 @@ struct Parsing<'src> {
 						self.read();
 						Identifier::find_or_create( name )
 					}
-					_ => return Err( self.err( "Expected variable".to_owned() ) )
+					_ => return Err( self.err( "Expected variable".to_string() ) )
 				};
 				
 				let block = unwrap_or_return_err!( self.parse_block() );
@@ -463,7 +463,7 @@ struct Parsing<'src> {
 					self.read();
 					Identifier::find_or_create( name )
 				}
-				_ => return Err( self.err( "Expected variable".to_owned() ) )
+				_ => return Err( self.err( "Expected variable".to_string() ) )
 			};
 			
 			let default = if self.peek() == token::Equals {
@@ -798,14 +798,14 @@ struct Parsing<'src> {
 			self.newline_policy = IgnoreNewlines;
 			
 			if self.peek() != token::LeftParenthesis {
-				return Err( self.err( "Expected `(`".to_owned() ) );
+				return Err( self.err( "Expected `(`".to_string() ) );
 			}
 			self.read();
 			
 			let parameters = unwrap_or_return_err!( self.parse_function_parameters() );
 			
 			if self.peek() != token::RightParenthesis {
-				return Err( self.err( "Expected `)`".to_owned() ) );
+				return Err( self.err( "Expected `)`".to_string() ) );
 			}
 			self.read();
 			
@@ -842,7 +842,7 @@ struct Parsing<'src> {
 						self.read();
 						Identifier::find_or_create( name )
 					}
-					_ => return Err( self.err( "Expected variable".to_owned() ) )
+					_ => return Err( self.err( "Expected variable".to_string() ) )
 				};
 				
 				let default = if self.peek() == token::Equals {
@@ -864,7 +864,7 @@ struct Parsing<'src> {
 						self.read();
 					}
 					token::RightParenthesis => break,
-					_ => return Err( self.err( "Expected `)` or `,`".to_owned() ) )
+					_ => return Err( self.err( "Expected `)` or `,`".to_string() ) )
 				};
 			}
 			
@@ -895,7 +895,7 @@ struct Parsing<'src> {
 					} )
 				}
 				
-				_ => Err( self.err( "Invalid lvalue".to_owned() ) )
+				_ => Err( self.err( "Invalid lvalue".to_string() ) )
 			}
 		}
 	}

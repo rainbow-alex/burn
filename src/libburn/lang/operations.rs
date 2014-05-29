@@ -28,15 +28,15 @@ pub fn is_truthy( value: &value::Value ) -> bool {
 pub fn repr( value: &value::Value ) -> String {
 	match *value {
 		
-		value::Nothing => "<Nothing>".to_owned(),
-		value::Boolean(..) => "<Boolean>".to_owned(),
-		value::Integer(..) => "<Integer>".to_owned(),
-		value::Float(..) => "<Float>".to_owned(),
-		value::String(..) => "<String>".to_owned(),
+		value::Nothing => "<Nothing>".to_string(),
+		value::Boolean(..) => "<Boolean>".to_string(),
+		value::Integer(..) => "<Integer>".to_string(),
+		value::Float(..) => "<Float>".to_string(),
+		value::String(..) => "<String>".to_string(),
 		
-		value::Function(..) => "<Function>".to_owned(),
-		value::TypeUnion(..) | value::TypeIntersection(..) => "<Type>".to_owned(),
-		value::Module(..) => "<Module>".to_owned(),
+		value::Function(..) => "<Function>".to_string(),
+		value::TypeUnion(..) | value::TypeIntersection(..) => "<Type>".to_string(),
+		value::Module(..) => "<Module>".to_string(),
 		
 		value::StaticSpecial( special ) => special.repr(),
 		value::RcSpecial( ref r ) => r.get().get().repr(),

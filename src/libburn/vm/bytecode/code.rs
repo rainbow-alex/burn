@@ -27,7 +27,7 @@ pub struct Code {
 			self.dump_indented( "" );
 		}
 		
-		fn dump_indented( &self, indent: &str ) {
+		fn dump_indented( &self, indent: &str ) { // TODO strbuf indent
 			println!( "{}  n_local_variables: {}", indent, self.n_local_variables );
 			println!( "{}  n_shared_local_variables: {}", indent, self.n_shared_local_variables );
 			println!( "{}  opcodes: {}", indent, self.opcodes.len() );
@@ -38,7 +38,7 @@ pub struct Code {
 			println!( "{}  functions: {}", indent, self.functions.len() );
 			for (i, f) in self.functions.iter().enumerate() {
 				println!( "{}    {}: \\{", indent, i );
-				f.get().code.dump_indented( indent.to_owned().append( "    " ).as_slice() );
+				f.get().code.dump_indented( indent.to_string().append( "    " ).as_slice() );
 			}
 			println!( "{}\\}", indent );
 		}

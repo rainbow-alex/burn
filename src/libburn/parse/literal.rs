@@ -3,14 +3,14 @@ use std::str::utf8_char_width;
 pub fn parse_int( source: &str ) -> Result<i64,String> {
 	match from_str::<i64>( source ) {
 		Some( i ) => Ok( i ),
-		None => Err( "Integer literal is out of range.".to_owned() ),
+		None => Err( "Integer literal is out of range.".to_string() ),
 	}
 }
 
 pub fn parse_float( source: &str ) -> Result<f64,String> {
 	match from_str::<f64>( source ) {
 		Some( f ) => Ok( f ),
-		None => Err( "Float literal is out of range.".to_owned() ),
+		None => Err( "Float literal is out of range.".to_string() ),
 	}
 }
 
@@ -55,7 +55,7 @@ pub fn parse_string( source: &str ) -> Result<String,(String,uint)> {
 						i += 2;
 					}
 					_ => {
-						return Err( ("Invalid escape sequence".to_owned(), i) );
+						return Err( ("Invalid escape sequence".to_string(), i) );
 					}
 				}
 			},
@@ -81,7 +81,7 @@ mod test {
 		assert!( parse_int( "3" ) == Ok( 3 ) );
 		assert!( parse_int( "123456789" ) == Ok( 123456789 ) );
 		assert!( parse_int( "-10" ) == Ok( -10 ) );
-		assert!( parse_int( "99999999999999999999999999999999999" ) == Err( "Integer literal is out of range.".to_owned() ) );
+		assert!( parse_int( "99999999999999999999999999999999999" ) == Err( "Integer literal is out of range.".to_string() ) );
 	}
 	
 	#[test]
@@ -91,6 +91,6 @@ mod test {
 	
 	#[test]
 	fn test_parse_string() {
-		assert!( parse_string( r#""test""# ) == Ok( "test".to_owned() ) );
+		assert!( parse_string( r#""test""# ) == Ok( "test".to_string() ) );
 	}
 }

@@ -64,7 +64,7 @@ pub struct StaticSpecial {
 		}
 		
 		#[inline]
-		pub fn repr( self ) -> String { self.def.repr.to_owned() }
+		pub fn repr( self ) -> String { self.def.repr.to_string() }
 		#[inline]
 		pub fn is_truthy( self ) -> bool { true }
 		#[inline]

@@ -10,7 +10,6 @@ pub enum OpCode {
 	// VM commands
 	Nop,
 	End,
-	ReturnPop,
 	
 	// Scopes, locals, cells
 	// PushLocal { pub depth: u32, pub index: u32 },
