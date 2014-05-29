@@ -25,11 +25,6 @@ pub enum Statement {
 		pub annotation: annotation::Use,
 	},
 	
-	Export {
-		pub path: Vec<Identifier>,
-		pub expression: Box<Expression>,
-	},
-	
 	ExpressionStatement {
 		pub expression: Box<Expression>,
 	},

@@ -109,6 +109,14 @@ pub fn subtract( left: &value::Value, right: &value::Value ) -> Result<value::Va
 	return Err( create_type_error( format!( "Can't subtract {} and {}", left.repr(), right.repr() ) ) );
 }
 
+pub fn multiply( left: &value::Value, right: &value::Value ) -> Result<value::Value,value::Value> {
+	return Err( create_type_error( format!( "Can't multiply {} and {}", left.repr(), right.repr() ) ) );
+}
+
+pub fn divide( left: &value::Value, right: &value::Value ) -> Result<value::Value,value::Value> {
+	return Err( create_type_error( format!( "Can't divide {} and {}", left.repr(), right.repr() ) ) );
+}
+
 pub fn union( left: value::Value, right: value::Value ) -> Result<value::Value,value::Value> {
 	
 	if ! implicit::is_type( &left ) {

@@ -32,4 +32,12 @@ pub struct Fiber {
 		pub fn push_frame( &mut self, frame: Frame ) {
 			self.frame_stack.push( mem::replace( &mut self.frame, frame ) );
 		}
+		
+		pub fn pop_data( &mut self ) -> value::Value {
+			self.data_stack.pop().unwrap()
+		}
+		
+		pub fn push_data( &mut self, value: value::Value ) {
+			self.data_stack.push( value );
+		}
 	}

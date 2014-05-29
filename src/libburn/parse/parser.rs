@@ -681,7 +681,9 @@ struct Parsing<'src> {
 								self.read();
 								identifier
 							}
-							_ => { fail!(); } // TODO
+							_ => {
+								return Err( self.err( "Expected identifier.".to_string() ) );
+							}
 						};
 						
 						expression = box node::DotAccess {
@@ -692,7 +694,7 @@ struct Parsing<'src> {
 					
 					token::LeftParenthesis => {
 						self.read();
-						self.read(); //TODO!
+						self.read(); // TODO
 						expression = box node::Call {
 							expression: expression,
 							arguments: Vec::new(),

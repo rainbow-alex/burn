@@ -10,6 +10,7 @@ pub enum OpCode {
 	// VM commands
 	Nop,
 	End,
+	Fail,
 	
 	// Scopes, locals, cells
 	// PushLocal { pub depth: u32, pub index: u32 },
@@ -65,6 +66,7 @@ pub enum OpCode {
 	// Access
 	GetProperty { pub name: Identifier },
 	SetProperty { pub name: Identifier },
+	GetItem,
 	
 	// Operations
 	Is,
@@ -77,4 +79,9 @@ pub enum OpCode {
 	Union,
 	Add,
 	Subtract,
+	Multiply,
+	Divide,
+	Not,
+	ShortCircuitAnd,
+	ShortCircuitOr,
 }

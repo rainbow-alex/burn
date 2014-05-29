@@ -21,6 +21,15 @@ pub enum FrameType {
 
 	impl Frame {
 		
+		pub fn new_builtin( operation: Box<rust::Operation> ) -> Frame {
+			Frame {
+				type_: Rust( operation ),
+				local_variables: Vec::new(),
+				shared_local_variables: Vec::new(),
+				instruction: 0,
+			}
+		}
+		
 		pub fn get_code<'l>( &'l mut self ) -> &'l mut Code {
 			match self.type_ {
 				Main( ref mut script ) => &mut *script.code,

@@ -71,6 +71,13 @@ pub struct Module {
 				None => { fail!(); },
 			}
 		}
+		
+		pub fn get_module<'l>( &'l mut self, name: &'static str ) -> &'l mut Module {
+			match self.modules.find_mut( &Identifier::find_or_create( name ) ) {
+				Some( module ) => &mut **module,
+				None => { fail!(); },
+			}
+		}
 	}
 
 pub struct Use {

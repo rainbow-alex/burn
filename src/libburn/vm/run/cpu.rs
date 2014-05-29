@@ -39,7 +39,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 				
 				rust::Ok( value ) => {
 					fiber.pop_frame();
-					fiber.data_stack.push( value );
+					fiber.push_data( value );
 					fiber.flow = flow::Running;
 					continue 'frame_loop;
 				}
@@ -82,17 +82,28 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 					);
 				} )
 				
+				macro_rules! throw (
+					( $throwable:expr ) => {{
+						fiber.flow = flow::Throwing( $throwable );
+						continue 'flow_loop;
+					}}
+				)
+				
 				match unsafe { *opcodes.offset( fiber.frame.instruction as int ) } {
 					
 					// Temporary
 					
 					opcode::Print => {
-						println!( "{}", fiber.data_stack.pop().unwrap().to_string() );
+						println!( "{}", fiber.pop_data().to_string() );
 					}
 					
 					// VM
 					
 					opcode::Nop => {}
+					
+					opcode::Fail => {
+						fail!();
+					}
 					
 					opcode::End => {
 						if fiber.frame_stack.len() > 0 {
@@ -115,7 +126,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 					}
 					
 					opcode::JumpIfPopFalsy { instruction: i } => {
-						if ! operations::is_truthy( &fiber.data_stack.pop().unwrap() ) {
+						if ! operations::is_truthy( &fiber.pop_data() ) {
 							fiber.frame.instruction = i;
 							continue 'instruction_loop;
 						}
@@ -134,7 +145,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						let args_ptr = unsafe { fiber.data_stack.as_ptr().offset( args_offset as int ) };
 						unsafe { fiber.data_stack.set_len( args_offset ) }
 						
-						match fiber.data_stack.pop().unwrap() {
+						match fiber.pop_data() {
 							
 							value::Function( function ) => {
 								
@@ -165,7 +176,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 					}
 					
 					opcode::Return => {
-						fiber.flow = flow::Returning( fiber.data_stack.pop().unwrap() );
+						fiber.flow = flow::Returning( fiber.pop_data() );
 						continue 'flow_loop;
 					}
 					
@@ -181,17 +192,15 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 					
 					opcode::Throw => {
 						
-						let throwable = fiber.data_stack.pop().unwrap();
+						let throwable = fiber.pop_data();
 						
 						if types::is_throwable( &throwable ) {
-							fiber.flow = flow::Throwing( throwable );
+							throw!( throwable );
 						} else {
 							let message = format!( "{} is not Throwable.", throwable.repr() );
 							let error = errors::create_type_error( message );
-							fiber.flow = flow::Throwing( error );
+							throw!( error );
 						}
-						
-						continue 'flow_loop;
 					}
 					
 					opcode::CatchOrJump { instruction: i } => {
@@ -201,7 +210,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							_ => fail!(),
 						};
 						
-						let type_ = fiber.data_stack.pop().unwrap();
+						let type_ = fiber.pop_data();
 						let result = operations::is( &throwable, &type_ );
 						
 						match result {
@@ -214,10 +223,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 								fiber.flow = flow::Catching( throwable );
 								continue 'instruction_loop;
 							}
-							Err( e ) => {
-								fiber.flow = flow::Throwing( e );
-								continue 'flow_loop;
-							}
+							Err( e ) => { throw!( e ); }
 						}
 					}
 					
@@ -233,13 +239,11 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 					}
 					
 					opcode::Rethrow => {
-						
-						fiber.flow = match fiber.flow {
-							flow::Catching( ref e ) => flow::Throwing( e.clone() ), // ref+clone because of rust#6393
+						let throwable = match fiber.flow {
+							flow::Catching( ref t ) => t.clone(), // ref+clone because of rust#6393
 							_ => fail!(),
 						};
-						
-						continue 'flow_loop;
+						throw!( throwable );
 					}
 					
 					opcode::StartFinally => {
@@ -266,74 +270,77 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 					// Values
 					
 					opcode::PushFunction { index: i } => {
-						
-						fiber.data_stack.push(
+						let function = Function::new( fiber.frame.get_code().functions.get( i ).clone() );
+						fiber.push_data(
 							value::Function(
 								vm.functions.register(
-									Function::new(
-										fiber.frame.get_code().functions.get( i ).clone()
-									)
+									function
 								)
 							)
 						);
 					}
 					
 					opcode::PushString { index: i } => {
-						fiber.data_stack.push( value::String( fiber.frame.get_code().strings.get( i ).clone() ) );
+						let string = fiber.frame.get_code().strings.get( i ).clone();
+						fiber.push_data( value::String( string ) );
 					}
 					
 					opcode::PushFloat { value: f } => {
-						fiber.data_stack.push( value::Float( f ) );
+						fiber.push_data( value::Float( f ) );
 					}
 					
 					opcode::PushInteger { value: i } => {
-						fiber.data_stack.push( value::Integer( i ) );
+						fiber.push_data( value::Integer( i ) );
 					}
 					
 					opcode::PushBoolean { value: b } => {
-						fiber.data_stack.push( value::Boolean( b ) );
+						fiber.push_data( value::Boolean( b ) );
 					}
 					
 					opcode::PushNothing => {
-						fiber.data_stack.push( value::Nothing );
+						fiber.push_data( value::Nothing );
 					}
 					
 					opcode::InlinedModule { ptr: ptr } => {
-						fiber.data_stack.push( value::Module( ptr ) );
+						fiber.push_data( value::Module( ptr ) );
 					}
 					
 					// Variables
 					
 					opcode::StoreLocal { index: i } => {
-						*fiber.frame.local_variables.get_mut( i ) = fiber.data_stack.pop().unwrap();
+						*fiber.frame.local_variables.get_mut( i ) = fiber.pop_data();
 					}
 					
 					opcode::LoadLocal { index: i } => {
-						fiber.data_stack.push( fiber.frame.local_variables.get( i ).clone() );
+						let value = fiber.frame.local_variables.get( i ).clone();
+						fiber.push_data( value );
 					}
 					
 					opcode::StoreSharedLocal { index: i } => {
-						*fiber.frame.shared_local_variables.get( i ).get() = fiber.data_stack.pop().unwrap();
+						*fiber.frame.shared_local_variables.get( i ).get() = fiber.pop_data();
 					}
 					
 					opcode::LoadSharedLocal { index: i } => {
-						fiber.data_stack.push( fiber.frame.shared_local_variables.get( i ).get().clone() );
+						let value = fiber.frame.shared_local_variables.get( i ).get().clone();
+						fiber.push_data( value );
 					}
 					
 					opcode::StoreStaticBound { index: i } => {
-						*fiber.frame.get_closure().static_bound_variables.get_mut( i ) = fiber.data_stack.pop().unwrap();
+						*fiber.frame.get_closure().static_bound_variables.get_mut( i ) = fiber.pop_data();
 					}
 					
 					opcode::LoadStaticBound { index: i } => {
-						fiber.data_stack.push( fiber.frame.get_closure().static_bound_variables.get( i ).clone() );
+						let value = fiber.frame.get_closure().static_bound_variables.get( i ).clone();
+						fiber.push_data( value );
 					}
 					
 					opcode::StoreSharedBound { index: i } => {
-						*fiber.frame.get_closure().shared_bound_variables.get( i ).get() = fiber.data_stack.pop().unwrap();
+						*fiber.frame.get_closure().shared_bound_variables.get( i ).get() = fiber.pop_data();
 					}
 					
 					opcode::LoadSharedBound { index: i } => {
-						fiber.data_stack.push( fiber.frame.get_closure().shared_bound_variables.get( i ).get().clone() );
+						let value = fiber.frame.get_closure().shared_bound_variables.get( i ).get().clone();
+						fiber.push_data( value );
 					}
 					
 					// Names
@@ -343,19 +350,14 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						unsafe { *opcodes.offset( fiber.frame.instruction as int ) = opcode::Nop; }
 						
 						fiber.frame.instruction += 1;
-						fiber.push_frame( frame::Frame {
-							type_: frame::Rust( operation as Box<rust::Operation> ),
-							local_variables: Vec::new(),
-							shared_local_variables: Vec::new(),
-							instruction: 0,
-						} );
+						fiber.push_frame( frame::Frame::new_builtin( operation as Box<rust::Operation> ) );
 						continue 'frame_loop;
 					}
 					
 					opcode::LoadImplicit { name: name } => {
 						match vm.implicit.get().find_id( name ) {
 							Ok( value ) => {
-								fiber.data_stack.push( value.clone() );
+								fiber.push_data( value.clone() );
 							}
 							Err( err ) => {
 								fiber.flow = flow::Throwing( err );
@@ -367,166 +369,148 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 					// Access
 					
 					opcode::GetProperty { name: name } => {
-						let left = fiber.data_stack.pop().unwrap();
+						let left = fiber.pop_data();
 						match operations::get_property( &left, name ) {
-							Ok( value ) => {
-								fiber.data_stack.push( value );
-							}
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
+							Ok( value ) => { fiber.push_data( value ); }
+							Err( err ) => { throw!( err ); }
 						}
 					}
 					
 					opcode::SetProperty { name: name } => {
-						let right = fiber.data_stack.pop().unwrap();
-						let left = fiber.data_stack.pop().unwrap();
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
 						match operations::set_property( &left, name, &right ) {
 							Ok(..) => {},
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
+							Err( err ) => { throw!( err ); }
 						}
+					}
+					
+					opcode::GetItem => {
+						let key = fiber.pop_data();
+						let expression = fiber.pop_data();
+						fail!( "TODO" );
 					}
 					
 					// Operators
 					
-					opcode::Is => {
-						let right = fiber.data_stack.pop().unwrap();
-						let left = fiber.data_stack.pop().unwrap();
-						match operations::is( &left, &right ) {
-							Ok( result ) => {
-								fiber.data_stack.push( value::Boolean( result ) );
-							}
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
-						};
-					}
-					
-					opcode::Eq => {
-						let right = fiber.data_stack.pop().unwrap();
-						let left = fiber.data_stack.pop().unwrap();
-						match operations::eq( &left, &right ) {
-							Ok( result ) => {
-								fiber.data_stack.push( value::Boolean( result ) );
-							}
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
-						};
-					}
-					
-					opcode::Neq => {
-						let right = fiber.data_stack.pop().unwrap();
-						let left = fiber.data_stack.pop().unwrap();
-						match operations::neq( &left, &right ) {
-							Ok( result ) => {
-								fiber.data_stack.push( value::Boolean( result ) );
-							}
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
-						};
-					}
-					
-					opcode::Lt => {
-						let right = fiber.data_stack.pop().unwrap();
-						let left = fiber.data_stack.pop().unwrap();
-						match operations::lt( &left, &right ) {
-							Ok( result ) => {
-								fiber.data_stack.push( value::Boolean( result ) );
-							}
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
-						};
-					}
-					
-					opcode::Gt => {
-						let right = fiber.data_stack.pop().unwrap();
-						let left = fiber.data_stack.pop().unwrap();
-						match operations::gt( &left, &right ) {
-							Ok( result ) => {
-								fiber.data_stack.push( value::Boolean( result ) );
-							}
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
-						};
-					}
-					
-					opcode::LtEq => {
-						let right = fiber.data_stack.pop().unwrap();
-						let left = fiber.data_stack.pop().unwrap();
-						match operations::lt_eq( &left, &right ) {
-							Ok( result ) => {
-								fiber.data_stack.push( value::Boolean( result ) );
-							}
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
-						};
-					}
-					
-					opcode::GtEq => {
-						let right = fiber.data_stack.pop().unwrap();
-						let left = fiber.data_stack.pop().unwrap();
-						match operations::gt_eq( &left, &right ) {
-							Ok( result ) => {
-								fiber.data_stack.push( value::Boolean( result ) );
-							}
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
-						};
-					}
-					
-					opcode::Union => {
-						let right = fiber.data_stack.pop().unwrap();
-						let left = fiber.data_stack.pop().unwrap();
-						match operations::union( left, right ) {
-							Ok( result ) => {
-								fiber.data_stack.push( result );
-							}
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
-						};
-					}
-					
 					opcode::Add => {
-						let right = fiber.data_stack.pop().unwrap();
-						let left = fiber.data_stack.pop().unwrap();
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
 						match operations::add( &left, &right ) {
-							Ok( result ) => fiber.data_stack.push( result ),
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
+							Ok( result ) => fiber.push_data( result ),
+							Err( err ) => { throw!( err ); }
 						};
 					}
 					
 					opcode::Subtract => {
-						let right = fiber.data_stack.pop().unwrap();
-						let left = fiber.data_stack.pop().unwrap();
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
 						match operations::subtract( &left, &right ) {
-							Ok( result ) => fiber.data_stack.push( result ),
-							Err( err ) => {
-								fiber.flow = flow::Throwing( err );
-								continue 'flow_loop;
-							}
+							Ok( result ) => fiber.push_data( result ),
+							Err( err ) => { throw!( err ); }
 						};
+					}
+					
+					opcode::Multiply => {
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
+						match operations::multiply( &left, &right ) {
+							Ok( result ) => fiber.push_data( result ),
+							Err( err ) => { throw!( err ); }
+						};
+					}
+					
+					opcode::Divide => {
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
+						match operations::divide( &left, &right ) {
+							Ok( result ) => fiber.push_data( result ),
+							Err( err ) => { throw!( err ); }
+						};
+					}
+					
+					opcode::Union => {
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
+						match operations::union( left, right ) {
+							Ok( value ) => { fiber.push_data( value ); }
+							Err( err ) => { throw!( err ); }
+						};
+					}
+					
+					opcode::Is => {
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
+						match operations::is( &left, &right ) {
+							Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
+							Err( err ) => { throw!( err ); }
+						};
+					}
+					
+					opcode::Eq => {
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
+						match operations::eq( &left, &right ) {
+							Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
+							Err( err ) => { throw!( err ); }
+						};
+					}
+					
+					opcode::Neq => {
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
+						match operations::neq( &left, &right ) {
+							Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
+							Err( err ) => { throw!( err ); }
+						};
+					}
+					
+					opcode::Lt => {
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
+						match operations::lt( &left, &right ) {
+							Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
+							Err( err ) => { throw!( err ); }
+						};
+					}
+					
+					opcode::Gt => {
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
+						match operations::gt( &left, &right ) {
+							Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
+							Err( err ) => { throw!( err ); }
+						};
+					}
+					
+					opcode::LtEq => {
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
+						match operations::lt_eq( &left, &right ) {
+							Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
+							Err( err ) => { throw!( err ); }
+						};
+					}
+					
+					opcode::GtEq => {
+						let right = fiber.pop_data();
+						let left = fiber.pop_data();
+						match operations::gt_eq( &left, &right ) {
+							Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
+							Err( err ) => { throw!( err ); }
+						};
+					}
+					
+					opcode::Not => {
+						fail!( "TODO" );
+					}
+					
+					opcode::ShortCircuitAnd => {
+						fail!( "TODO" );
+					}
+					
+					opcode::ShortCircuitOr => {
+						fail!( "TODO" );
 					}
 					
 				} // match opcode
@@ -587,7 +571,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 					flow::PopFrame { data_stack_len: n } => {
 						fiber.pop_frame();
 						fiber.data_stack.truncate( n );
-						fiber.data_stack.push( value );
+						fiber.push_data( value );
 						fiber.flow = flow::Running;
 						continue 'frame_loop;
 					}
@@ -618,9 +602,9 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 					
 					flow::StartFinally { instruction: i } => {
 						fiber.suppressed_flows.push( flow::Throwing( throwable ) );
-						fiber.flow = flow::Running;
 						fiber.flow_points.push( flow::PopSuppressedFlow );
 						fiber.frame.instruction = i;
+						fiber.flow = flow::Running;
 						continue 'frame_loop;
 					}
 					

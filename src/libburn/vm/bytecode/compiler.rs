@@ -266,6 +266,20 @@ struct Compilation {
 					self.code.opcodes.push( opcode::Print );
 				}
 				
+				node::Return {
+					expression: ref mut expression,
+				} => {
+					match *expression {
+						Some( ref mut expression ) => {
+							self.compile_expression( *expression );
+						}
+						None => {
+							self.code.opcodes.push( opcode::PushNothing );
+						}
+					};
+					self.code.opcodes.push( opcode::Return );
+				}
+				
 				node::Throw {
 					expression: ref mut expression,
 				} => {
@@ -451,8 +465,6 @@ struct Compilation {
 						self.code.opcodes.push( opcode::EndFinally );
 					}
 				}
-				
-				_ => fail!(), // TODO
 			}
 		}
 		
@@ -538,7 +550,7 @@ struct Compilation {
 						}
 						annotation::Use( use_annotation ) => {
 							use_annotation.get().operation.get().add_inline( Raw::new( self.code ), self.code.opcodes.len() );
-							self.code.opcodes.push( opcode::Nop ); // TODO Fail opcode
+							self.code.opcodes.push( opcode::Fail );
 						}
 					};
 				}
@@ -549,6 +561,15 @@ struct Compilation {
 				} => {
 					self.compile_expression( *expression );
 					self.code.opcodes.push( opcode::GetProperty { name: name } );
+				}
+				
+				node::ItemAccess {
+					expression: ref mut expression,
+					key_expression: ref mut key_expression,
+				} => {
+					self.compile_expression( *expression );
+					self.compile_expression( *key_expression );
+					self.code.opcodes.push( opcode::GetItem );
 				}
 				
 				node::Call {
@@ -581,6 +602,24 @@ struct Compilation {
 					self.compile_expression( *left );
 					self.compile_expression( *right );
 					self.code.opcodes.push( opcode::Subtract );
+				}
+				
+				node::Multiplication {
+					left: ref mut left,
+					right: ref mut right,
+				} => {
+					self.compile_expression( *left );
+					self.compile_expression( *right );
+					self.code.opcodes.push( opcode::Multiply );
+				}
+				
+				node::Division {
+					left: ref mut left,
+					right: ref mut right,
+				} => {
+					self.compile_expression( *left );
+					self.compile_expression( *right );
+					self.code.opcodes.push( opcode::Divide );
 				}
 				
 				node::Union {
@@ -655,6 +694,33 @@ struct Compilation {
 					self.code.opcodes.push( opcode::GtEq );
 				}
 				
+				node::Not {
+					expression: ref mut expression,
+				} => {
+					self.compile_expression( *expression );
+					self.code.opcodes.push( opcode::Not );
+				}
+				
+				node::And {
+					left: ref mut left,
+					right: ref mut right,
+				} => {
+					self.compile_expression( *left );
+					let placeholder = self.create_placeholder();
+					self.compile_expression( *right );
+					self.fill_in_placeholder( placeholder, opcode::ShortCircuitAnd );
+				}
+				
+				node::Or {
+					left: ref mut left,
+					right: ref mut right,
+				} => {
+					self.compile_expression( *left );
+					let placeholder = self.create_placeholder();
+					self.compile_expression( *right );
+					self.fill_in_placeholder( placeholder, opcode::ShortCircuitOr );
+				}
+				
 				node::Function {
 					parameters: _,
 					frame: ref frame,
@@ -670,8 +736,6 @@ struct Compilation {
 					self.code.opcodes.push( opcode::PushFunction { index: self.code.functions.len() } );
 					self.code.functions.push( definition );
 				}
-				
-				_ => fail!(), // TODO
 			}
 		}
 	}
