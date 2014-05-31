@@ -33,6 +33,10 @@ pub struct Fiber {
 			self.frame_stack.push( mem::replace( &mut self.frame, frame ) );
 		}
 		
+		pub fn replace_flow( &mut self, flow: flow::Flow ) -> flow::Flow {
+			mem::replace( &mut self.flow, flow )
+		}
+		
 		pub fn pop_data( &mut self ) -> value::Value {
 			self.data_stack.pop().unwrap()
 		}

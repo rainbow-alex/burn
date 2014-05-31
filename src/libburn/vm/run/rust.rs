@@ -1,5 +1,4 @@
 use lang::value;
-use vm::error::Error;
 use vm::run::frame::Frame;
 use vm::virtual_machine::VirtualMachine;
 
@@ -10,8 +9,10 @@ pub trait Operation {
 pub enum Result {
 	Ok( value::Value ),
 	Throw( value::Value ),
+	TailBurn( Frame ),
+	TailRust( Box<Operation> ),
+	TailYield,
 	Burn( Frame ),
 	Rust( Box<Operation> ),
 	Yield,
-	Fail( Vec<Box<Error>> ),
 }

@@ -57,12 +57,7 @@ pub fn compile_script( source: &str ) -> Result<frame::Frame,Vec<Box<Error>>> {
 	let locals = Vec::from_elem( script.code.n_local_variables, value::Nothing );
 	let shared = Vec::from_fn( script.code.n_shared_local_variables, |_| { Rc::new( value::Nothing ) } );
 	
-	Ok( frame::Frame {
-		type_: frame::Main( script ),
-		local_variables: locals,
-		shared_local_variables: shared,
-		instruction: 0,
-	} )
+	Ok( frame::Frame::new_main( script, locals, shared ) )
 }
 
 pub fn compile_repl( repl_state: &mut repl::State, source: &str ) -> Result<frame::Frame,Vec<Box<Error>>> {
@@ -113,12 +108,7 @@ pub fn compile_repl( repl_state: &mut repl::State, source: &str ) -> Result<fram
 		*shared.get_mut( variable.local_storage_index ) = repl_state.variables.find( &variable.name ).unwrap().clone();
 	}
 	
-	Ok( frame::Frame {
-		type_: frame::Main( script ),
-		local_variables: locals,
-		shared_local_variables: shared,
-		instruction: 0,
-	} )
+	Ok( frame::Frame::new_main( script, locals, shared ) )
 }
 
 struct Compilation {
@@ -157,7 +147,7 @@ struct Compilation {
 			for statement in root.statements.mut_iter() {
 				self.compile_statement( *statement );
 			}
-			self.code.opcodes.push( opcode::End );
+			self.code.opcodes.push( opcode::ReturnNothing );
 			
 			self.frames.pop();
 		}
@@ -172,9 +162,7 @@ struct Compilation {
 			for statement in block.mut_iter() {
 				self.compile_statement( *statement );
 			}
-			
-			self.code.opcodes.push( opcode::PushNothing );
-			self.code.opcodes.push( opcode::Return );
+			self.code.opcodes.push( opcode::ReturnNothing );
 			
 			self.frames.pop();
 		}

@@ -28,23 +28,19 @@ pub struct AnalyzeResolution {
 			}
 		}
 		
-		#[inline(always)]
 		fn tick( &mut self ) -> annotation::Time {
 			self.time += 1;
 			self.time
 		}
 		
-		#[inline(always)]
 		fn push_frame( &mut self, frame: &mut annotation::Frame ) {
 			self.frames.push( Raw::new( frame ) );
 		}
 		
-		#[inline(always)]
 		fn pop_frame( &mut self ) {
 			self.frames.pop();
 		}
 		
-		#[inline(always)]
 		fn push_scope( &mut self ) {
 			self.scopes.push( Scope {
 				declared_variables: Vec::new(),
@@ -52,12 +48,10 @@ pub struct AnalyzeResolution {
 			} );
 		}
 		
-		#[inline(always)]
 		fn pop_scope( &mut self ) {
 			self.scopes.pop();
 		}
 		
-		#[inline(always)]
 		fn get_current_scope<'l>( &'l mut self ) -> &'l mut Scope {
 			self.scopes.mut_last().unwrap()
 		}

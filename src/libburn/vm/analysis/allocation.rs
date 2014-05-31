@@ -24,7 +24,6 @@ pub struct AnalyzeAllocation {
 			}
 		}
 		
-		#[inline(always)]
 		fn push_frame( &mut self ) {
 			self.frames.push( Frame {
 				n_local_variables: 0,
@@ -34,12 +33,10 @@ pub struct AnalyzeAllocation {
 			} );
 		}
 		
-		#[inline(always)]
 		fn pop_frame( &mut self ) {
 			self.frames.pop();
 		}
 		
-		#[inline(always)]
 		fn get_current_frame<'l>( &'l mut self ) -> &'l mut Frame {
 			self.frames.mut_last().unwrap()
 		}

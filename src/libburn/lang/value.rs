@@ -37,9 +37,7 @@ pub enum Value {
 }
 
 	impl Value {
-		#[inline]
 		pub fn repr( &self ) -> String { operations::repr( self ) }
-		#[inline]
 		pub fn to_string( &self ) -> String { operations::to_string( self ) }
 	}
 	

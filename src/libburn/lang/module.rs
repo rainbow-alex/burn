@@ -56,7 +56,6 @@ pub struct Module {
 			self.locked = true
 		}
 		
-		#[inline]
 		pub fn find_id( &self, identifier: Identifier ) -> Result<value::Value, value::Value> {
 			match self.contents.find( &identifier ) {
 				Some( value ) => Ok( value.clone() ),
@@ -64,7 +63,6 @@ pub struct Module {
 			}
 		}
 		
-		#[inline]
 		pub fn get_id( &self, identifier: Identifier ) -> value::Value {
 			match self.contents.find( &identifier ) {
 				Some( value ) => value.clone(),
@@ -158,7 +156,10 @@ pub struct Use {
 								let source = ::std::io::File::open( &path ).unwrap().read_to_str().unwrap();
 								return match compiler::compile_script( source.as_slice() ) {
 									Ok( frame ) => rust::Burn( frame ),
-									Err( errors ) => rust::Fail( errors ),
+									Err( errors ) => {
+										(errors);
+										return rust::Throw( value::Integer( 5 ) ); // TODO
+									}
 								}
 							}
 						}

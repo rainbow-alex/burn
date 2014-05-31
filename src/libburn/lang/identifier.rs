@@ -36,7 +36,6 @@ pub struct Identifier {
 			}
 		}
 		
-		#[inline]
 		pub fn get_value<'l>( &'l self ) -> &'l str {
 			self.ptr.get().value.as_slice()
 		}

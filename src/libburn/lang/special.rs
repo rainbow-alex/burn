@@ -24,7 +24,6 @@ pub struct RcSpecial {
 			unsafe { ::core::intrinsics::type_id::<T>() == self.type_id }
 		}
 		
-		#[inline(always)]
 		pub fn get<'a>( &'a mut self ) -> &'a mut RefCountedSpecial {
 			// won't coerce without a tmp var, seems to be a bug
 			let tmp: &mut RefCountedSpecial = self.special;
@@ -63,14 +62,9 @@ pub struct StaticSpecial {
 			StaticSpecial { def: def }
 		}
 		
-		#[inline]
 		pub fn repr( self ) -> String { self.def.repr.to_string() }
-		#[inline]
 		pub fn is_truthy( self ) -> bool { true }
-		#[inline]
 		pub fn is_type( self ) -> bool { &self.def.type_test as *_ != &static_not_a_type as *_ }
-		#[inline]
 		pub fn type_test( self, value: &value::Value ) -> bool { ( self.def.type_test )( value ) }
-		#[inline]
 		pub fn is_throwable( self ) -> bool { false }
 	}

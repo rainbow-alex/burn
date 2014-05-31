@@ -9,7 +9,6 @@ pub enum OpCode {
 	
 	// VM commands
 	Nop,
-	End,
 	Fail,
 	
 	// Scopes, locals, cells
@@ -25,6 +24,7 @@ pub enum OpCode {
 	// Function flow
 	Call { pub n_arguments: uint },
 	Return,
+	ReturnNothing,
 	
 	// Try catch
 	PushStartCatchFlowPoint { pub instruction: uint },
