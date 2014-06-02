@@ -3,6 +3,7 @@ use lang::value;
 use builtin::burn::implicit;
 use builtin::burn::errors::create_type_error;
 use mem::rc::Rc;
+use vm::run::rust;
 
 pub fn is_truthy( value: &value::Value ) -> bool {
 	match *value {
@@ -21,7 +22,6 @@ pub fn is_truthy( value: &value::Value ) -> bool {
 		
 		value::StaticSpecial(..) => true,
 		value::RcSpecial( ref r ) => r.get().get().is_truthy(),
-		
 	}
 }
 
@@ -43,37 +43,37 @@ pub fn repr( value: &value::Value ) -> String {
 	}
 }
 
-pub fn to_string( value: &value::Value ) -> String {
+pub fn to_string( value: &value::Value ) -> rust::Result {
 	match *value {
 		
-		value::Nothing => "nothing".into_owned(),
-		value::Boolean( b ) => ( if b { "true" } else { "false" } ).into_owned(),
-		value::Integer( i ) => format!( "{}", i ),
-		value::Float( f ) => format!( "{}", f ),
-		value::String( ref s ) => s.get().clone(),
+		value::Nothing => rust::Ok( value::String( Rc::new( "nothing".into_string() ) ) ),
+		value::Boolean( b ) => rust::Ok( value::String( Rc::new( ( if b { "true" } else { "false" } ).into_string() ) ) ),
+		value::Integer( i ) => rust::Ok( value::String( Rc::new( format!( "{}", i ) ) ) ),
+		value::Float( f ) => rust::Ok( value::String( Rc::new( format!( "{}", f ) ) ) ),
+		value::String( ref s ) => rust::Ok( value::String( Rc::new( s.get().clone() ) ) ),
 		
-		value::StaticSpecial( special ) => special.repr(),
-		value::RcSpecial( ref r ) => r.get().get().to_string(),
+		value::StaticSpecial( special ) => rust::Ok( value::String( Rc::new( special.repr() ) ) ),
+		value::RcSpecial( ref r ) => rust::Ok( value::String( Rc::new( r.get().get().to_string() ) ) ),
 		
-		_ => { value.repr() }
+		_ => { rust::Ok( value::String( Rc::new( value.repr() ) ) ) }
 	}
 }
 
-pub fn add( left: &value::Value, right: &value::Value ) -> Result<value::Value,value::Value> {
+pub fn add( left: &value::Value, right: &value::Value ) -> rust::Result {
 	match *left {
 		
 		value::Integer( l ) => {
 			match *right {
-				value::Integer( r ) => { return Ok( value::Integer( l + r ) ); }
-				value::Float( r ) => { return Ok( value::Float( l as f64 + r ) ); }
+				value::Integer( r ) => { return rust::Ok( value::Integer( l + r ) ); }
+				value::Float( r ) => { return rust::Ok( value::Float( l as f64 + r ) ); }
 				_ => {}
 			}
 		}
 		
 		value::Float( l ) => {
 			match *right {
-				value::Integer( r ) => { return Ok( value::Float( l + r as f64 ) ); }
-				value::Float( r ) => { return Ok( value::Float( l + r ) ); }
+				value::Integer( r ) => { return rust::Ok( value::Float( l + r as f64 ) ); }
+				value::Float( r ) => { return rust::Ok( value::Float( l + r ) ); }
 				_ => {}
 			}
 		}
@@ -81,24 +81,24 @@ pub fn add( left: &value::Value, right: &value::Value ) -> Result<value::Value,v
 		_ => {}
 	}
 	
-	return Err( create_type_error( format!( "Can't add {} and {}", left.repr(), right.repr() ) ) );
+	return rust::Throw( create_type_error( format!( "Can't add {} and {}", left.repr(), right.repr() ) ) );
 }
 
-pub fn subtract( left: &value::Value, right: &value::Value ) -> Result<value::Value,value::Value> {
+pub fn subtract( left: &value::Value, right: &value::Value ) -> rust::Result {
 	match *left {
 		
 		value::Integer( l ) => {
 			match *right {
-				value::Integer( r ) => { return Ok( value::Integer( l - r ) ); }
-				value::Float( r ) => { return Ok( value::Float( l as f64 - r ) ); }
+				value::Integer( r ) => { return rust::Ok( value::Integer( l - r ) ); }
+				value::Float( r ) => { return rust::Ok( value::Float( l as f64 - r ) ); }
 				_ => {}
 			}
 		}
 		
 		value::Float( l ) => {
 			match *right {
-				value::Integer( r ) => { return Ok( value::Float( l - r as f64 ) ); }
-				value::Float( r ) => { return Ok( value::Float( l - r ) ); }
+				value::Integer( r ) => { return rust::Ok( value::Float( l - r as f64 ) ); }
+				value::Float( r ) => { return rust::Ok( value::Float( l - r ) ); }
 				_ => {}
 			}
 		}
@@ -106,28 +106,28 @@ pub fn subtract( left: &value::Value, right: &value::Value ) -> Result<value::Va
 		_ => {}
 	}
 	
-	return Err( create_type_error( format!( "Can't subtract {} and {}", left.repr(), right.repr() ) ) );
+	return rust::Throw( create_type_error( format!( "Can't subtract {} and {}", left.repr(), right.repr() ) ) );
 }
 
-pub fn multiply( left: &value::Value, right: &value::Value ) -> Result<value::Value,value::Value> {
-	return Err( create_type_error( format!( "Can't multiply {} and {}", left.repr(), right.repr() ) ) );
+pub fn multiply( left: &value::Value, right: &value::Value ) -> rust::Result {
+	return rust::Throw( create_type_error( format!( "Can't multiply {} and {}", left.repr(), right.repr() ) ) );
 }
 
-pub fn divide( left: &value::Value, right: &value::Value ) -> Result<value::Value,value::Value> {
-	return Err( create_type_error( format!( "Can't divide {} and {}", left.repr(), right.repr() ) ) );
+pub fn divide( left: &value::Value, right: &value::Value ) -> rust::Result {
+	return rust::Throw( create_type_error( format!( "Can't divide {} and {}", left.repr(), right.repr() ) ) );
 }
 
-pub fn union( left: value::Value, right: value::Value ) -> Result<value::Value,value::Value> {
+pub fn union( left: value::Value, right: value::Value ) -> rust::Result {
 	
 	if ! implicit::is_type( &left ) {
-		return Err( create_type_error( format!( "Can't create type union: {} is not a type", left.repr() ) ) );
+		return rust::Throw( create_type_error( format!( "Can't create type union: {} is not a type", left.repr() ) ) );
 	}
 	
 	if ! implicit::is_type( &right ) {
-		return Err( create_type_error( format!( "Can't create type union: {} is not a type", right.repr() ) ) );
+		return rust::Throw( create_type_error( format!( "Can't create type union: {} is not a type", right.repr() ) ) );
 	}
 	
-	Ok( value::TypeUnion( Rc::new( ::lang::type_::TypeUnion::new( left, right ) ) ) )
+	rust::Ok( value::TypeUnion( Rc::new( ::lang::type_::TypeUnion::new( left, right ) ) ) )
 }
 
 pub fn is( value: &value::Value, type_: &value::Value ) -> Result<bool,value::Value> {
@@ -161,36 +161,36 @@ pub fn is( value: &value::Value, type_: &value::Value ) -> Result<bool,value::Va
 	) )
 }
 
-pub fn eq( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
-	return Err( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+pub fn eq( left: &value::Value, right: &value::Value ) -> rust::Result {
+	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
 }
 
-pub fn neq( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
-	return Err( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+pub fn neq( left: &value::Value, right: &value::Value ) -> rust::Result {
+	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
 }
 
-pub fn lt( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
-	return Err( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+pub fn lt( left: &value::Value, right: &value::Value ) -> rust::Result {
+	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
 }
 
-pub fn gt( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
-	return Err( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+pub fn gt( left: &value::Value, right: &value::Value ) -> rust::Result {
+	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
 }
 
-pub fn lt_eq( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
-	gt( left, right ).and_then( |v| { Ok( !v ) } )
+pub fn lt_eq( left: &value::Value, right: &value::Value ) -> rust::Result {
+	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
 }
 
-pub fn gt_eq( left: &value::Value, right: &value::Value ) -> Result<bool,value::Value> {
-	return Err( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+pub fn gt_eq( left: &value::Value, right: &value::Value ) -> rust::Result {
+	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
 }
 
-pub fn get_property( accessed: &value::Value, name: Identifier ) -> Result<value::Value, value::Value> {
+pub fn get_property( accessed: &value::Value, name: Identifier ) -> rust::Result {
 	(accessed); (name);
-	Ok( value::Nothing ) // TODO
+	rust::Ok( value::Nothing ) // TODO
 }
 
-pub fn set_property( accessed: &value::Value, name: Identifier, value: &value::Value ) -> Result<(), value::Value> {
+pub fn set_property( accessed: &value::Value, name: Identifier, value: &value::Value ) -> rust::Result {
 	(accessed); (name); (value);
-	Ok( () ) // TODO
+	rust::Ok( value::Nothing ) // TODO
 }

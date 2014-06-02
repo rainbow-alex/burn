@@ -10,9 +10,8 @@ use vm::run::rust::Operation;
 use builtin::burn::{errors, types};
 
 pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
-		
+	
 	'frame_loop: loop {
-		
 	if fiber.frame.is_rust() {
 		
 		let result = match fiber.replace_flow( flow::Running ) {
@@ -44,7 +43,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 			_ => fail!()
 		}
 		
-	} else {
+	} else { // not a rust-type frame
 		
 		let opcodes = fiber.frame.get_code().opcodes.as_mut_ptr();
 		
@@ -71,12 +70,27 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						}}
 					)
 					
+					macro_rules! handle_operation_result (
+						( $operation:expr ) => {{
+							match $operation {
+								rust::Ok( result ) => { fiber.push_data( result ); }
+								rust::Throw( t ) => { throw!( t ); }
+								_ => { fail!(); }
+							};
+						}}
+					)
+					
 					match unsafe { *opcodes.offset( fiber.frame.instruction as int ) } {
 						
 						// Temporary
 						
 						opcode::Print => {
-							println!( "{}", fiber.pop_data().to_string() );
+							match fiber.pop_data().to_string() {
+								rust::Ok( value::String( s ) ) => println!( "{}", s.get() ),
+								rust::Ok( _ ) => { fail!(); }
+								rust::Throw( t ) => { throw!( t ); }
+								_ => { fail!( "TODO" ); }
+							};
 						}
 						
 						// VM
@@ -350,19 +364,13 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						
 						opcode::GetProperty { name: name } => {
 							let left = fiber.pop_data();
-							match operations::get_property( &left, name ) {
-								Ok( value ) => { fiber.push_data( value ); }
-								Err( err ) => { throw!( err ); }
-							}
+							handle_operation_result!( operations::get_property( &left, name ) );
 						}
 						
 						opcode::SetProperty { name: name } => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::set_property( &left, name, &right ) {
-								Ok(..) => {},
-								Err( err ) => { throw!( err ); }
-							}
+							handle_operation_result!( operations::set_property( &left, name, &right ) );
 						}
 						
 						opcode::GetItem => {
@@ -377,46 +385,31 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						opcode::Add => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::add( &left, &right ) {
-								Ok( result ) => fiber.push_data( result ),
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::add( &left, &right ) );
 						}
 						
 						opcode::Subtract => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::subtract( &left, &right ) {
-								Ok( result ) => fiber.push_data( result ),
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::subtract( &left, &right ) );
 						}
 						
 						opcode::Multiply => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::multiply( &left, &right ) {
-								Ok( result ) => fiber.push_data( result ),
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::multiply( &left, &right ) );
 						}
 						
 						opcode::Divide => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::divide( &left, &right ) {
-								Ok( result ) => fiber.push_data( result ),
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::divide( &left, &right ) );
 						}
 						
 						opcode::Union => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::union( left, right ) {
-								Ok( value ) => { fiber.push_data( value ); }
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::union( left, right ) );
 						}
 						
 						opcode::Is => {
@@ -431,55 +424,37 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						opcode::Eq => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::eq( &left, &right ) {
-								Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::eq( &left, &right ) );
 						}
 						
 						opcode::Neq => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::neq( &left, &right ) {
-								Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::neq( &left, &right ) );
 						}
 						
 						opcode::Lt => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::lt( &left, &right ) {
-								Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::lt( &left, &right ) );
 						}
 						
 						opcode::Gt => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::gt( &left, &right ) {
-								Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::gt( &left, &right ) );
 						}
 						
 						opcode::LtEq => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::lt_eq( &left, &right ) {
-								Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::lt_eq( &left, &right ) );
 						}
 						
 						opcode::GtEq => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::gt_eq( &left, &right ) {
-								Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::gt_eq( &left, &right ) );
 						}
 						
 						opcode::Not => {

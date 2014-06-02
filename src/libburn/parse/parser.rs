@@ -44,7 +44,7 @@ struct Parsing<'src> {
 	newline_policy: NewlinePolicy,
 }
 
-	#[deriving(Eq)]
+	#[deriving(PartialEq, Eq)]
 	enum NewlinePolicy {
 		IgnoreNewlines,
 		HeedNewlines,
@@ -166,7 +166,7 @@ struct Parsing<'src> {
 				match self.peek() {
 					token::Newline => self.skip_newlines(),
 					token::Eof => break,
-					_ => return Err( self.err( "Expected newline.".into_owned() ) )
+					_ => return Err( self.err( "Expected newline.".into_string() ) )
 				}
 			}
 			
@@ -182,7 +182,7 @@ struct Parsing<'src> {
 			
 			match self.peek() {
 				token::LeftCurlyBracket => { self.read(); }
-				_ => return Err( self.err( "Expected `{`." .into_owned() ) )
+				_ => return Err( self.err( "Expected `{`." .into_string() ) )
 			}
 			
 			let old_newline_policy = self.newline_policy;

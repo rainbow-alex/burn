@@ -67,7 +67,7 @@ pub fn parse_string( source: &str ) -> Result<String,(String,uint)> {
 		}
 	}
 	
-	Ok( buf.into_owned() )
+	Ok( buf.into_string() )
 }
 
 #[cfg(test)]

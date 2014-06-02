@@ -11,7 +11,7 @@ struct IdentifierContainer {
 	value: String,
 }
 
-#[deriving(Copy, Eq, TotalEq)]
+#[deriving(Copy, PartialEq, Eq)]
 pub struct Identifier {
 	ptr: Raw<IdentifierContainer>,
 }
@@ -28,8 +28,8 @@ pub struct Identifier {
 				}
 				
 				let container = ALL.get().find_or_insert_with(
-					value.into_owned(),
-					|_| { box IdentifierContainer { value: value.into_owned() } }
+					value.into_string(),
+					|_| { box IdentifierContainer { value: value.into_string() } }
 				);
 				
 				Identifier { ptr: Raw::new( *container ) }

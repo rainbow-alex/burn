@@ -39,11 +39,13 @@ pub struct Frame {
 		}
 	}
 	
-	impl Eq for Frame {
+	impl PartialEq for Frame {
 		fn eq( &self, other: &Frame ) -> bool {
 			self as *Frame == other as *Frame
 		}
 	}
+	
+	impl Eq for Frame {}
 
 pub struct Variable {
 	pub name: Identifier,
@@ -75,11 +77,13 @@ pub struct Variable {
 		}
 	}
 	
-	impl Eq for Variable {
+	impl PartialEq for Variable {
 		fn eq( &self, other: &Variable ) -> bool {
 			self as *Variable == other as *Variable
 		}
 	}
+	
+	impl Eq for Variable {}
 
 pub struct ReadVariable {
 	pub time: Time,

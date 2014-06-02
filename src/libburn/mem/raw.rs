@@ -40,13 +40,13 @@ pub struct Raw<T> {
 		}
 	}
 	
-	impl<T> Eq for Raw<T> {
+	impl<T> PartialEq for Raw<T> {
 		fn eq( &self, other: &Raw<T> ) -> bool {
 			self.ptr == other.ptr
 		}
 	}
 	
-	impl<T> TotalEq for Raw<T> {}
+	impl<T> Eq for Raw<T> {}
 	
 	impl<T> fmt::Show for Raw<T> {
 		fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {

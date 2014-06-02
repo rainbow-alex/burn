@@ -32,7 +32,7 @@ struct TypeError {
 }
 
 	impl Special for TypeError {
-		fn repr( &self ) -> String { "<TypeError>".into_owned() }
+		fn repr( &self ) -> String { "<TypeError>".into_string() }
 		fn to_string( &self ) -> String { format!( "TypeError: {}", self.message ) }
 		fn is_throwable( &self ) -> bool { true }
 	}
@@ -64,7 +64,7 @@ struct ArgumentError {
 }
 
 	impl Special for ArgumentError {
-		fn repr( &self ) -> String { "<ArgumentError>".into_owned() }
+		fn repr( &self ) -> String { "<ArgumentError>".into_string() }
 		fn to_string( &self ) -> String { format!( "ArgumentError: {}", self.message ) }
 		fn is_throwable( &self ) -> bool { true }
 	}

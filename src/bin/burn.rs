@@ -116,7 +116,12 @@ fn process_input( input: Input, args: Vec<String> ) {
 		
 		result::UncaughtThrowable( t ) => {
 			let _ = writeln!( io::stderr(), "Uncaught throwable:" );
-			let _ = writeln!( io::stderr(), "{}", t.to_string() );
+			match t.sync_to_string() {
+				Ok( s ) => {
+					let _ = writeln!( io::stderr(), "{}", s.get() );
+				}
+				_ => { fail!( "TODO" ); }
+			};
 			os::set_exit_status( 2 );
 		}
 	}
@@ -162,7 +167,12 @@ fn repl() {
 			
 			result::UncaughtThrowable( t ) => {
 				let _ = writeln!( io::stderr(), "Uncaught throwable:" );
-				let _ = writeln!( io::stderr(), "{}", t.to_string() );
+				match t.sync_to_string() {
+					Ok( s ) => {
+						let _ = writeln!( io::stderr(), "{}", s.get() );
+					}
+					_ => { fail!( "TODO" ); }
+				};
 			}
 		}
 		

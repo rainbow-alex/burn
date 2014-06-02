@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[deriving(Eq)]
+#[deriving(PartialEq, Eq)]
 pub enum Token<'src> {
 	Whitespace,
 	Newline,
