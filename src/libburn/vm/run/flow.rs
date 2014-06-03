@@ -13,5 +13,6 @@ pub enum FlowPoint {
 	StartCatch { pub instruction: uint },
 	StartFinally { pub instruction: uint },
 	PopFrame { pub data_stack_len: uint },
+	PopFrameAndRestoreFlow { pub data_stack_len: uint },
 	PopSuppressedFlow,
 }
