@@ -136,7 +136,7 @@ pub struct Use {
 									self.loaded = value::Module( Raw::new( module ) );
 									vm.module_root.add_module_with_id( name, module );
 									
-									self.root_sources.push( Path::new( "/home/alex/burn/modules/example/src/example.burn" ) );
+									self.root_sources.push( Path::new( "modules/example/src/example.burn" ) );
 									
 									self.step = ImportRoot;
 									continue 'step_loop;
