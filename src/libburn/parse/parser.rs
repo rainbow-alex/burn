@@ -253,12 +253,12 @@ struct Parsing<'src> {
 			loop {
 				
 				match self.peek() {
-					token::Identifier ( identifier ) => {
+					token::Identifier( identifier ) => {
 						path.push( Identifier::find_or_create( identifier ) );
 						self.peek();
 					}
 					_ => {
-						fail!();
+						return Err( self.err( "Expected identifier.".to_string() ) );
 					}
 				}
 				
@@ -494,9 +494,12 @@ struct Parsing<'src> {
 		/// Parse binary and unary expressions.
 		///
 		/// The algorithm used is called "precedence climbing".
-		/// Basically you keep greedily matching lower precedence operators. For every operator found,
-		/// the right-hand side subexpression is parsed by recursing (with a limit on how low the precedence can then go).
+		/// Basically you keep greedily matching lower precedence operators.
+		/// For every operator found, the right-hand side subexpression is parsed by recursing
+		/// (with a limit on how low the precedence can then go).
+		///
 		/// See http://en.wikipedia.org/wiki/Operator-precedence_parser
+		///
 		/// Note that in this implementation the outer loop has been unrolled.
 		fn parse_op_expression( &mut self, min_precedence: Precedence ) -> ParseResult<Box<node::Expression>> {
 			

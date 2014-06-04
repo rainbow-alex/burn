@@ -1,6 +1,6 @@
 use mem::rc::Rc;
 use mem::gc::Gc;
-use lang::value;
+use lang::value::Value;
 use lang::script::Script;
 use lang::function::Function;
 use vm::bytecode::code::Code;
@@ -8,12 +8,12 @@ use vm::run::rust;
 
 pub struct Frame {
 	type_: FrameType,
-	local_variables: Vec<value::Value>,
-	shared_local_variables: Vec<Rc<value::Value>>,
+	local_variables: Vec<Value>,
+	shared_local_variables: Vec<Rc<Value>>,
 	pub instruction: uint,
 }
 
-pub enum FrameType {
+enum FrameType {
 	Main( Script ),
 	Function( Gc<Function> ),
 	Rust( Box<rust::Operation> ),
@@ -21,7 +21,7 @@ pub enum FrameType {
 
 	impl Frame {
 		
-		pub fn new_main( script: Script, locals: Vec<value::Value>, shared: Vec<Rc<value::Value>> ) -> Frame {
+		pub fn new_main( script: Script, locals: Vec<Value>, shared: Vec<Rc<Value>> ) -> Frame {
 			Frame {
 				type_: Main( script ),
 				local_variables: locals,
@@ -30,7 +30,7 @@ pub enum FrameType {
 			}
 		}
 		
-		pub fn new_function( function: Gc<Function>, locals: Vec<value::Value>, shared: Vec<Rc<value::Value>> ) -> Frame {
+		pub fn new_function( function: Gc<Function>, locals: Vec<Value>, shared: Vec<Rc<Value>> ) -> Frame {
 			Frame {
 				type_: Function( function ),
 				local_variables: locals,
@@ -59,30 +59,30 @@ pub enum FrameType {
 			match self.type_ {
 				Main( ref mut script ) => &mut *script.code,
 				Function( ref mut function ) => &mut *function.get().definition.get().code,
-				Rust(..) => fail!(),
+				Rust(..) => impossible!(),
 			}
 		}
 		
 		pub fn get_closure( &self ) -> &mut Function {
 			match self.type_ {
-				Main(..) => fail!(),
+				Main(..) => impossible!(),
 				Function( ref function ) => function.get(),
-				Rust(..) => fail!(),
+				Rust(..) => impossible!(),
 			}
 		}
 		
 		pub fn get_rust_operation<'l>( &'l mut self ) -> &'l mut Box<rust::Operation> {
 			match self.type_ {
 				Rust( ref mut operation ) => operation,
-				_ => { fail!(); }
+				_ => { impossible!(); }
 			}
 		}
 		
-		pub fn get_local_variable<'l>( &'l mut self, index: uint ) -> &'l mut value::Value {
+		pub fn get_local_variable<'l>( &'l mut self, index: uint ) -> &'l mut Value {
 			self.local_variables.get_mut( index )
 		}
 		
-		pub fn get_shared_local_variable<'l>( &'l mut self, index: uint ) -> &'l mut Rc<value::Value> {
+		pub fn get_shared_local_variable<'l>( &'l mut self, index: uint ) -> &'l mut Rc<Value> {
 			self.shared_local_variables.get_mut( index )
 		}
 	}

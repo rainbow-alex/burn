@@ -121,8 +121,12 @@ pub struct AnalyzeResolution {
 			self.analyze_block( &mut root.statements );
 			
 			// put any new vars into repl_state
-			for var in self.get_current_scope().declared_variables.iter().skip( repl_state.variables.len() ) {
-				repl_state.declare_variable( var.get().name );
+			{
+				let declared_variables = self.get_current_scope().declared_variables.iter();
+				let mut new_variables = declared_variables.skip( repl_state.variables.len() );
+				for var in new_variables {
+					repl_state.declare_variable( var.get().name );
+				}
 			}
 			
 			self.pop_scope();
@@ -145,7 +149,8 @@ pub struct AnalyzeResolution {
 					source_offset: source_offset,
 				} => {
 					
-					let is_duplicate = self.get_current_scope().declared_variables.iter().find( |v| { v.get().name == name } ).is_some();
+					let is_duplicate = self.get_current_scope().declared_variables.iter()
+						.find( |v| { v.get().name == name } ).is_some();
 					
 					if is_duplicate {
 						self.errors.push( AnalysisError {

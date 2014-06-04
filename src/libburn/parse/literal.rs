@@ -81,7 +81,8 @@ mod test {
 		assert!( parse_int( "3" ) == Ok( 3 ) );
 		assert!( parse_int( "123456789" ) == Ok( 123456789 ) );
 		assert!( parse_int( "-10" ) == Ok( -10 ) );
-		assert!( parse_int( "99999999999999999999999999999999999" ) == Err( "Integer literal is out of range.".to_string() ) );
+		assert!( parse_int( "99999999999999999999999999999999999" )
+			== Err( "Integer literal is out of range.".to_string() ) );
 	}
 	
 	#[test]

@@ -122,7 +122,7 @@ fn process_input( input: Input, args: Vec<String> ) {
 				Ok( s ) => {
 					let _ = writeln!( io::stderr(), "{}", s.get() );
 				}
-				_ => { fail!(); } // todo!
+				_ => { fail!( "not_implemented!" ); }
 			};
 			os::set_exit_status( 2 );
 		}
@@ -173,7 +173,7 @@ fn repl() {
 					Ok( s ) => {
 						let _ = writeln!( io::stderr(), "{}", s.get() );
 					}
-					_ => { fail!(); } // todo!
+					_ => { fail!( "not_implemented!" ); }
 				};
 			}
 		}

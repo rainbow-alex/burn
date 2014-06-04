@@ -54,9 +54,9 @@ pub struct Variable {
 	pub writes: Vec<WriteVariable>,
 	pub root_binds: Vec<BindVariable>,
 	pub n_binds: uint,
-	pub local_storage_type: StorageType,
+	pub local_storage_type: storage::LocalStorageType,
 	pub local_storage_index: uint,
-	pub bound_storage_type: BoundStorageType,
+	pub bound_storage_type: storage::BoundStorageType,
 }
 
 	impl Variable {
@@ -69,9 +69,9 @@ pub struct Variable {
 				writes: Vec::new(),
 				root_binds: Vec::new(),
 				n_binds: 0,
-				local_storage_type: SharedLocalStorage,
+				local_storage_type: storage::SharedLocal,
 				local_storage_index: 0,
-				bound_storage_type: SharedBoundStorage,
+				bound_storage_type: storage::SharedBound,
 				// bound_storage_index differs per Binding
 			}
 		}
@@ -98,11 +98,6 @@ pub struct BindVariable {
 	pub mutable: bool,
 }
 
-pub enum StorageType {
-	LocalStorage,
-	SharedLocalStorage,
-}
-
 pub struct Closure {
 	pub created_at: Time,
 	pub bindings: Vec<Binding>,
@@ -126,11 +121,6 @@ pub struct Binding {
 	pub variable: Raw<Variable>,
 	pub mutable: bool,
 	pub storage_index: uint,
-}
-
-pub enum BoundStorageType {
-	StaticBoundStorage,
-	SharedBoundStorage,
 }
 
 pub struct Use {
@@ -164,4 +154,17 @@ pub struct Name {
 pub enum NameResolution {
 	Implicit,
 	Use( Raw<Use> ),
+}
+
+pub mod storage {
+	
+	pub enum LocalStorageType {
+		Local,
+		SharedLocal,
+	}
+	
+	pub enum BoundStorageType {
+		StaticBound,
+		SharedBound,
+	}
 }

@@ -28,7 +28,7 @@ macro_rules! impossible (
 	() => { fail!(); }
 )
 
-macro_rules! unwrap_enum (
+macro_rules! destructure_enum (
 	( $e:expr to $p:pat => $b:block ) => {
 		match $e {
 			$p => $b,

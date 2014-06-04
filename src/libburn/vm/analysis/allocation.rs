@@ -45,17 +45,24 @@ pub struct AnalyzeAllocation {
 			self.analyze_frame( &mut root.frame, 0 );
 		}
 		
-		pub fn analyze_repl_root( &mut self, root: &mut node::Root, repl_state: &mut repl::State ) {
+		pub fn analyze_repl_root(
+			&mut self,
+			root: &mut node::Root,
+			repl_state: &mut repl::State
+		) {
 			self.analyze_frame( &mut root.frame, repl_state.variables.len() );
 		}
 		
-		fn analyze_frame( &mut self, frame: &mut annotation::Frame, n_repl_vars: uint ) {
-			
+		fn analyze_frame(
+			&mut self,
+			frame: &mut annotation::Frame,
+			n_repl_vars: uint
+		) {
 			self.push_frame();
 			
 			for variable in frame.declared_variables.mut_iter().take( n_repl_vars ) {
-				variable.local_storage_type = annotation::SharedLocalStorage;
-				variable.bound_storage_type = annotation::SharedBoundStorage;
+				variable.local_storage_type = annotation::storage::SharedLocal;
+				variable.bound_storage_type = annotation::storage::SharedBound;
 			}
 			
 			for variable in frame.declared_variables.mut_iter().skip( n_repl_vars ) {
@@ -67,14 +74,12 @@ pub struct AnalyzeAllocation {
 			}
 			
 			for function in frame.functions.mut_iter() {
-				match *function.get() {
-					
-					node::Function { frame: ref mut frame, .. } => {
-						self.analyze_frame( frame, 0 );
-					}
-					
-					_ => { fail!(); }
-				}
+				destructure_enum!( *function.get() to node::Function {
+					frame: ref mut frame,
+					..
+				} => {
+					self.analyze_frame( frame, 0 );
+				} );
 			}
 			
 			frame.n_local_variables = self.get_current_frame().n_local_variables;
@@ -101,7 +106,7 @@ pub struct AnalyzeAllocation {
 			match variable.root_binds.len() {
 				
 				0 => {
-					variable.local_storage_type = annotation::LocalStorage;
+					variable.local_storage_type = annotation::storage::Local;
 				}
 				
 				1 => {
@@ -110,8 +115,8 @@ pub struct AnalyzeAllocation {
 					for write in variable.writes.iter() {
 						if write.time > only_bind.time {
 							// The variable is assigned to after binding.
-							variable.local_storage_type = annotation::SharedLocalStorage;
-							variable.bound_storage_type = annotation::SharedBoundStorage;
+							variable.local_storage_type = annotation::storage::SharedLocal;
+							variable.bound_storage_type = annotation::storage::SharedBound;
 							return;
 						}
 					}
@@ -119,31 +124,33 @@ pub struct AnalyzeAllocation {
 					if ! only_bind.mutable {
 						// The variable is never assigned to after binding.
 						// It is effectively immutable!
-						variable.local_storage_type = annotation::LocalStorage;
-						variable.bound_storage_type = annotation::StaticBoundStorage;
+						variable.local_storage_type = annotation::storage::Local;
+						variable.bound_storage_type = annotation::storage::StaticBound;
 						return;
 					}
 					
 					for read in variable.reads.iter() {
 						if read.time > only_bind.time {
-							// The variable is assigned to inside the binding function, but also read after binding.
-							variable.local_storage_type = annotation::SharedLocalStorage;
-							variable.bound_storage_type = annotation::SharedBoundStorage;
+							// The variable is assigned to inside the binding function,
+							// but also read after binding.
+							variable.local_storage_type = annotation::storage::SharedLocal;
+							variable.bound_storage_type = annotation::storage::SharedBound;
 							return;
 						}
 					}
 					
 					if ! variable.n_binds == 1 {
 						// In the declaring frame, the variable is dead after binding.
-						// The binding function mutates the variable, but since it is the only owner of the value, it can be static.
-						variable.local_storage_type = annotation::LocalStorage;
-						variable.bound_storage_type = annotation::StaticBoundStorage;
+						// The binding function mutates the variable,
+						// but since it is the only owner of the value, it can be static.
+						variable.local_storage_type = annotation::storage::Local;
+						variable.bound_storage_type = annotation::storage::StaticBound;
 					}
 					
 					// In the declaring frame, the variable is dead after binding, so it can be local.
 					// The binding functions have to share, since they mutate the variable.
-					variable.local_storage_type = annotation::LocalStorage;
-					variable.bound_storage_type = annotation::SharedBoundStorage;
+					variable.local_storage_type = annotation::storage::Local;
+					variable.bound_storage_type = annotation::storage::SharedBound;
 				}
 				
 				_ => {
@@ -151,8 +158,8 @@ pub struct AnalyzeAllocation {
 					for bind in variable.root_binds.iter() {
 						if bind.mutable {
 							// Multiple bindings and at least one mutates.
-							variable.local_storage_type = annotation::SharedLocalStorage;
-							variable.bound_storage_type = annotation::SharedBoundStorage;
+							variable.local_storage_type = annotation::storage::SharedLocal;
+							variable.bound_storage_type = annotation::storage::SharedBound;
 						}
 					}
 					
@@ -161,16 +168,16 @@ pub struct AnalyzeAllocation {
 					for write in variable.writes.iter() {
 						if write.time > first_binding.time {
 							// The variable is assigned to after a binding.
-							variable.local_storage_type = annotation::SharedLocalStorage;
-							variable.bound_storage_type = annotation::SharedBoundStorage;
+							variable.local_storage_type = annotation::storage::SharedLocal;
+							variable.bound_storage_type = annotation::storage::SharedBound;
 							return;
 						}
 					}
 					
 					// The variable is never assigned to after binding.
 					// It is effectively immutable!
-					variable.local_storage_type = annotation::LocalStorage;
-					variable.bound_storage_type = annotation::StaticBoundStorage;
+					variable.local_storage_type = annotation::storage::Local;
+					variable.bound_storage_type = annotation::storage::StaticBound;
 				}
 			}
 		}
@@ -178,12 +185,12 @@ pub struct AnalyzeAllocation {
 		fn determine_declared_variable_storage_index( &mut self, variable: &mut annotation::Variable ) {
 			match variable.local_storage_type {
 				
-				annotation::LocalStorage => {
+				annotation::storage::Local => {
 					variable.local_storage_index = self.get_current_frame().n_local_variables;
 					self.get_current_frame().n_local_variables += 1;
 				}
 				
-				annotation::SharedLocalStorage => {
+				annotation::storage::SharedLocal => {
 					variable.local_storage_index = self.get_current_frame().n_shared_local_variables;
 					self.get_current_frame().n_shared_local_variables += 1;
 				}
@@ -193,12 +200,12 @@ pub struct AnalyzeAllocation {
 		fn determine_binding_storage_index( &mut self, binding: &mut annotation::Binding ) {
 			match binding.variable.get().bound_storage_type {
 				
-				annotation::StaticBoundStorage => {
+				annotation::storage::StaticBound => {
 					binding.storage_index = self.get_current_frame().n_static_bound_variables;
 					self.get_current_frame().n_static_bound_variables += 1;
 				}
 				
-				annotation::SharedBoundStorage => {
+				annotation::storage::SharedBound => {
 					binding.storage_index = self.get_current_frame().n_shared_bound_variables;
 					self.get_current_frame().n_shared_bound_variables += 1;
 				}

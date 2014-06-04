@@ -152,7 +152,14 @@ impl<'src> Lexer<'src> {
 				
 				loop {
 					match self.peek_char( self.offset + length ) {
-						Some( 'a'..'z' ) | Some( 'A'..'Z' ) | Some( '0'..'9' ) | Some( '_' ) | Some( ':' ) => { length += 1; }
+						
+						Some( 'a'..'z' )
+						| Some( 'A'..'Z' )
+						| Some( '0'..'9' )
+						| Some( '_' )
+						| Some( ':' )
+						=> { length += 1; }
+						
 						_ => { break; }
 					}
 				}

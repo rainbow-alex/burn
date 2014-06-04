@@ -10,10 +10,10 @@ use vm::bytecode::opcode;
 use vm::analysis::annotation;
 use vm::analysis::resolution::AnalyzeResolution;
 use vm::analysis::allocation::AnalyzeAllocation;
-use vm::run::frame;
+use vm::run::frame::Frame;
 use vm::repl;
 
-pub fn compile_script( source: &str ) -> Result<frame::Frame,Vec<Box<Error>>> {
+pub fn compile_script( source: &str ) -> Result<Frame,Vec<Box<Error>>> {
 	
 	debug!( { println!( "COMPILER: Parsing..." ); } )
 	
@@ -54,13 +54,19 @@ pub fn compile_script( source: &str ) -> Result<frame::Frame,Vec<Box<Error>>> {
 	
 	let script = ::lang::script::Script { code: code };
 	
-	let locals = Vec::from_elem( script.code.n_local_variables, value::Nothing );
-	let shared = Vec::from_fn( script.code.n_shared_local_variables, |_| { Rc::new( value::Nothing ) } );
+	let locals = Vec::from_elem(
+		script.code.n_local_variables,
+		value::Nothing
+	);
+	let shared = Vec::from_fn(
+		script.code.n_shared_local_variables,
+		|_| { Rc::new( value::Nothing ) }
+	);
 	
-	Ok( frame::Frame::new_main( script, locals, shared ) )
+	Ok( Frame::new_main( script, locals, shared ) )
 }
 
-pub fn compile_repl( repl_state: &mut repl::State, source: &str ) -> Result<frame::Frame,Vec<Box<Error>>> {
+pub fn compile_repl( repl_state: &mut repl::State, source: &str ) -> Result<Frame,Vec<Box<Error>>> {
 	
 	debug!( { println!( "COMPILER: Parsing..." ); } )
 	
@@ -101,14 +107,21 @@ pub fn compile_repl( repl_state: &mut repl::State, source: &str ) -> Result<fram
 	
 	let script = ::lang::script::Script { code: code };
 	
-	let locals = Vec::from_elem( script.code.n_local_variables, value::Nothing );
-	let mut shared = Vec::from_fn( script.code.n_shared_local_variables, |_| { Rc::new( value::Nothing ) } );
+	let locals = Vec::from_elem(
+		script.code.n_local_variables,
+		value::Nothing
+	);
+	let mut shared = Vec::from_fn(
+		script.code.n_shared_local_variables,
+		|_| { Rc::new( value::Nothing ) }
+	);
 	
 	for variable in ast.root.frame.declared_variables.iter().take( repl_state.variables.len() ) {
-		*shared.get_mut( variable.local_storage_index ) = repl_state.variables.find( &variable.name ).unwrap().clone();
+		let repl_var = repl_state.variables.find( &variable.name ).unwrap().clone();
+		*shared.get_mut( variable.local_storage_index ) = repl_var;
 	}
 	
-	Ok( frame::Frame::new_main( script, locals, shared ) )
+	Ok( Frame::new_main( script, locals, shared ) )
 }
 
 struct Compilation {
@@ -210,11 +223,15 @@ struct Compilation {
 							if variable.declared_in.get() == self.get_current_frame() {
 								
 								match variable.local_storage_type {
-									annotation::LocalStorage => {
-										self.code.opcodes.push( opcode::StoreLocal { index: variable.local_storage_index } );
+									annotation::storage::Local => {
+										self.code.opcodes.push(
+											opcode::StoreLocal( variable.local_storage_index )
+										);
 									}
-									annotation::SharedLocalStorage => {
-										self.code.opcodes.push( opcode::StoreSharedLocal { index: variable.local_storage_index } );
+									annotation::storage::SharedLocal => {
+										self.code.opcodes.push(
+											opcode::StoreSharedLocal( variable.local_storage_index )
+										);
 									}
 								};
 								
@@ -228,11 +245,15 @@ struct Compilation {
 								};
 								
 								match variable.bound_storage_type {
-									annotation::StaticBoundStorage => {
-										self.code.opcodes.push( opcode::StoreStaticBound { index: bound_storage_index } );
+									annotation::storage::StaticBound => {
+										self.code.opcodes.push(
+											opcode::StoreStaticBound( bound_storage_index )
+										);
 									}
-									annotation::SharedBoundStorage => {
-										self.code.opcodes.push( opcode::StoreSharedBound { index: bound_storage_index } );
+									annotation::storage::SharedBound => {
+										self.code.opcodes.push(
+											opcode::StoreSharedBound( bound_storage_index )
+										);
 									}
 								};
 							}
@@ -262,11 +283,15 @@ struct Compilation {
 						self.compile_expression( *default.as_mut().unwrap() );
 						
 						match annotation.local_storage_type {
-							annotation::LocalStorage => {
-								self.code.opcodes.push( opcode::StoreLocal { index: annotation.local_storage_index } );
+							annotation::storage::Local => {
+								self.code.opcodes.push(
+									opcode::StoreLocal( annotation.local_storage_index )
+								);
 							}
-							annotation::SharedLocalStorage => {
-								self.code.opcodes.push( opcode::StoreSharedLocal { index: annotation.local_storage_index } );
+							annotation::storage::SharedLocal => {
+								self.code.opcodes.push(
+									opcode::StoreSharedLocal( annotation.local_storage_index )
+								);
 							}
 						};
 					}
@@ -527,11 +552,15 @@ struct Compilation {
 					if current_frame.closure.is_none() || variable.declared_in.get() == current_frame {
 						
 						match variable.local_storage_type {
-							annotation::LocalStorage => {
-								self.code.opcodes.push( opcode::LoadLocal { index: variable.local_storage_index } );
+							annotation::storage::Local => {
+								self.code.opcodes.push(
+									opcode::LoadLocal( variable.local_storage_index )
+								);
 							}
-							annotation::SharedLocalStorage => {
-								self.code.opcodes.push( opcode::LoadSharedLocal { index: variable.local_storage_index } );
+							annotation::storage::SharedLocal => {
+								self.code.opcodes.push(
+									opcode::LoadSharedLocal( variable.local_storage_index )
+								);
 							}
 						}
 						
@@ -541,11 +570,15 @@ struct Compilation {
 							if binding.variable.get() == variable {
 								
 								match variable.bound_storage_type {
-									annotation::StaticBoundStorage => {
-										self.code.opcodes.push( opcode::LoadStaticBound { index: binding.storage_index } );
+									annotation::storage::StaticBound => {
+										self.code.opcodes.push(
+											opcode::LoadStaticBound( binding.storage_index )
+										);
 									}
-									annotation::SharedBoundStorage => {
-										self.code.opcodes.push( opcode::LoadSharedBound { index: binding.storage_index } );
+									annotation::storage::SharedBound => {
+										self.code.opcodes.push(
+											opcode::LoadSharedBound( binding.storage_index )
+										);
 									}
 								}
 								
@@ -564,7 +597,8 @@ struct Compilation {
 							self.code.opcodes.push( opcode::LoadImplicit { name: identifier } );
 						}
 						annotation::Use( use_annotation ) => {
-							use_annotation.get().operation.get().add_inline( Raw::new( self.code ), self.code.opcodes.len() );
+							let operation = use_annotation.get().operation.get();
+							operation.add_inline( Raw::new( self.code ), self.code.opcodes.len() );
 							self.code.opcodes.push( opcode::Fail );
 						}
 					};
@@ -750,13 +784,13 @@ struct Compilation {
 					for parameter in parameters.iter() {
 						let variable = parameter.variable.get();
 						match variable.local_storage_type {
-							annotation::LocalStorage => {
+							annotation::storage::Local => {
 								parameter_definitions.push( function::FunctionParameterDefinition {
 									name: variable.name,
 									storage: function::LocalFunctionParameterStorage( variable.local_storage_index ),
 								} );
 							}
-							annotation::SharedLocalStorage => {
+							annotation::storage::SharedLocal => {
 								parameter_definitions.push( function::FunctionParameterDefinition {
 									name: variable.name,
 									storage: function::SharedLocalFunctionParameterStorage( variable.local_storage_index ),
@@ -774,13 +808,13 @@ struct Compilation {
 						if variable.declared_in == current_frame {
 							
 							match variable.bound_storage_type {
-								annotation::StaticBoundStorage => {
+								annotation::storage::StaticBound => {
 									binding_definitions.push( function::LocalToStaticBoundBinding(
 										variable.local_storage_index,
 										binding.storage_index
 									) );
 								}
-								annotation::SharedBoundStorage => {
+								annotation::storage::SharedBound => {
 									binding_definitions.push( function::SharedLocalToSharedBoundBinding(
 										variable.local_storage_index,
 										binding.storage_index
@@ -791,18 +825,17 @@ struct Compilation {
 						// bound to bound
 						} else {
 							
-							let current_binding = current_frame.get().closure.as_ref().unwrap().bindings.iter().find( |b| {
-								b.variable.get() == variable
-							} ).unwrap();
+							let current_binding = current_frame.get().closure.as_ref().unwrap().bindings.iter()
+								.find( |b| { b.variable.get() == variable } ).unwrap();
 							
 							match variable.bound_storage_type {
-								annotation::StaticBoundStorage => {
+								annotation::storage::StaticBound => {
 									binding_definitions.push( function::StaticBoundToStaticBoundBinding(
 										current_binding.storage_index,
 										binding.storage_index
 									) );
 								}
-								annotation::SharedBoundStorage => {
+								annotation::storage::SharedBound => {
 									binding_definitions.push( function::SharedBoundToSharedBoundBinding(
 										current_binding.storage_index,
 										binding.storage_index

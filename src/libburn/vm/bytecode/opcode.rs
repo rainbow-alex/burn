@@ -51,14 +51,14 @@ pub enum OpCode {
 	InlinedModule { pub ptr: Raw<::lang::module::Module> },
 	
 	// Variables
-	StoreLocal { pub index: uint },
-	LoadLocal { pub index: uint },
-	StoreSharedLocal { pub index: uint },
-	LoadSharedLocal { pub index: uint },
-	StoreStaticBound { pub index: uint },
-	LoadStaticBound { pub index: uint },
-	StoreSharedBound { pub index: uint },
-	LoadSharedBound { pub index: uint },
+	StoreLocal( uint ),
+	LoadLocal( uint ),
+	StoreSharedLocal( uint ),
+	LoadSharedLocal( uint ),
+	StoreStaticBound( uint ),
+	LoadStaticBound( uint ),
+	StoreSharedBound( uint ),
+	LoadSharedBound( uint ),
 	
 	// Names
 	Use { pub operation: Raw<::lang::module::Use> },

@@ -174,7 +174,7 @@ pub struct Use {
 						
 						match value {
 							Ok( value::Nothing ) => {},
-							Ok( _ ) => { fail!(); },
+							Ok( _ ) => { impossible!(); },
 							Err( t ) => {
 								return rust::Throw( t );
 							}
@@ -186,7 +186,7 @@ pub struct Use {
 							}
 							Some( name ) => {
 								(name);
-								fail!();
+								not_implemented!();
 							}
 						}
 					}
@@ -195,7 +195,7 @@ pub struct Use {
 						
 						let opcode = match self.loaded {
 							value::Module( m ) => opcode::InlinedModule { ptr: m },
-							_ => { fail!(); }
+							_ => { not_implemented!(); }
 						};
 						
 						for &(code, offset) in self.inlines.iter() {

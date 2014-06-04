@@ -164,6 +164,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						opcode::Call { n_arguments: n_arguments } => {
 							
 							let function_offset = fiber.data_stack.len() - n_arguments - 1;
+							// optimize! could use an unsafe copy here, with an unsafe set_len later
 							let function = mem::replace( fiber.data_stack.get_mut( function_offset ), value::Nothing );
 							
 							match function {
@@ -172,8 +173,14 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 									
 									fiber.frame.instruction += 1;
 									
-									let mut locals = Vec::from_elem( function.get().definition.get().code.n_local_variables, value::Nothing );
-									let mut shared = Vec::from_fn( function.get().definition.get().code.n_shared_local_variables, |_| { Rc::new( value::Nothing ) } );
+									let mut locals = Vec::from_elem(
+										function.get().definition.get().code.n_local_variables,
+										value::Nothing
+									);
+									let mut shared = Vec::from_fn(
+										function.get().definition.get().code.n_shared_local_variables,
+										|_| { Rc::new( value::Nothing ) }
+									);
 									
 									let parameters = function.get().definition.get().parameters.as_slice();
 									assert!( n_arguments == parameters.len() );
@@ -257,7 +264,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						opcode::CatchOrJump { instruction: i } => {
 							
 							// optimize! get rid of this clone
-							let throwable = unwrap_enum!( fiber.flow to flow::Catching( ref t ) => { t.clone() } );
+							let throwable = destructure_enum!( fiber.flow to flow::Catching( ref t ) => { t.clone() } );
 							let type_ = fiber.pop_data();
 							
 							match operations::is( &throwable, &type_ ) {
@@ -320,31 +327,32 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						
 						opcode::PushFunction { index: i } => {
 							
-							let mut function = function::Function::new( fiber.frame.get_code().functions.get( i ).clone() );
+							let definition = fiber.frame.get_code().functions.get( i ).clone();
+							let mut function = function::Function::new( definition );
 							
 							for binding in function.definition.get().bindings.iter() {
 								match *binding {
 									function::LocalToStaticBoundBinding( from, to ) => {
-										*function.static_bound_variables.get_mut( to ) = fiber.frame.get_local_variable( from ).clone();
+										let bound_var = fiber.frame.get_local_variable( from ).clone();
+										*function.static_bound_variables.get_mut( to ) = bound_var;
 									}
 									function::SharedLocalToSharedBoundBinding( from, to ) => {
-										*function.shared_bound_variables.get_mut( to ) = fiber.frame.get_shared_local_variable( from ).clone();
+										let bound_var = fiber.frame.get_shared_local_variable( from ).clone();
+										*function.shared_bound_variables.get_mut( to ) = bound_var;
 									}
 									function::StaticBoundToStaticBoundBinding( from, to ) => {
-										*function.static_bound_variables.get_mut( to ) = fiber.frame.get_closure().static_bound_variables.get( from ).clone();
+										let bound_var = fiber.frame.get_closure().static_bound_variables.get( from ).clone();
+										*function.static_bound_variables.get_mut( to ) = bound_var;
 									}
 									function::SharedBoundToSharedBoundBinding( from, to ) => {
-										*function.shared_bound_variables.get_mut( to ) = fiber.frame.get_closure().shared_bound_variables.get( from ).clone();
+										let bound_var = fiber.frame.get_closure().shared_bound_variables.get( from ).clone();
+										*function.shared_bound_variables.get_mut( to ) = bound_var;
 									}
 								}
 							}
 							
 							fiber.push_data(
-								value::Function(
-									vm.functions.register(
-										function
-									)
-								)
+								value::Function( vm.functions.register( function ) )
 							);
 						}
 						
@@ -375,38 +383,38 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						
 						// Variables
 						
-						opcode::StoreLocal { index: i } => {
+						opcode::StoreLocal( i ) => {
 							*fiber.frame.get_local_variable( i ) = fiber.pop_data();
 						}
 						
-						opcode::LoadLocal { index: i } => {
+						opcode::LoadLocal( i ) => {
 							let value = fiber.frame.get_local_variable( i ).clone();
 							fiber.push_data( value );
 						}
 						
-						opcode::StoreSharedLocal { index: i } => {
+						opcode::StoreSharedLocal( i ) => {
 							*fiber.frame.get_shared_local_variable( i ).get() = fiber.pop_data();
 						}
 						
-						opcode::LoadSharedLocal { index: i } => {
+						opcode::LoadSharedLocal( i ) => {
 							let value = fiber.frame.get_shared_local_variable( i ).get().clone();
 							fiber.push_data( value );
 						}
 						
-						opcode::StoreStaticBound { index: i } => {
+						opcode::StoreStaticBound( i ) => {
 							*fiber.frame.get_closure().static_bound_variables.get_mut( i ) = fiber.pop_data();
 						}
 						
-						opcode::LoadStaticBound { index: i } => {
+						opcode::LoadStaticBound( i ) => {
 							let value = fiber.frame.get_closure().static_bound_variables.get( i ).clone();
 							fiber.push_data( value );
 						}
 						
-						opcode::StoreSharedBound { index: i } => {
+						opcode::StoreSharedBound( i ) => {
 							*fiber.frame.get_closure().shared_bound_variables.get( i ).get() = fiber.pop_data();
 						}
 						
-						opcode::LoadSharedBound { index: i } => {
+						opcode::LoadSharedBound( i ) => {
 							let value = fiber.frame.get_closure().shared_bound_variables.get( i ).get().clone();
 							fiber.push_data( value );
 						}
@@ -563,14 +571,19 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						}
 						
 						flow::StartFinally { instruction: i } => {
-							fiber.suppressed_flows.push( flow::Jumping { n_flow_points: n_flow_points, instruction: instruction } );
+							fiber.suppressed_flows.push( flow::Jumping {
+								n_flow_points: n_flow_points,
+								instruction: instruction,
+							} );
 							fiber.flow_points.push( flow::PopSuppressedFlow );
 							fiber.set_flow( flow::Running );
 							fiber.frame.instruction = i;
 							continue 'flow_loop;
 						}
 						
-						flow::PopFrame {..} | flow::PopFrameAndRestoreFlow {..} => fail!(),
+						flow::PopFrame {..}
+						| flow::PopFrameAndRestoreFlow {..}
+						=> { impossible!(); }
 						
 						flow::PopSuppressedFlow => {
 							fiber.suppressed_flows.pop();
