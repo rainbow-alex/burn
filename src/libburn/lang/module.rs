@@ -63,8 +63,12 @@ pub struct Module {
 			}
 		}
 		
-		pub fn get_id( &self, identifier: Identifier ) -> value::Value {
-			match self.contents.find( &identifier ) {
+		pub fn get( &self, name: &'static str ) -> value::Value {
+			self.get_id( Identifier::find_or_create( name ) )
+		}
+		
+		pub fn get_id( &self, name: Identifier ) -> value::Value {
+			match self.contents.find( &name ) {
 				Some( value ) => value.clone(),
 				None => { fail!(); },
 			}

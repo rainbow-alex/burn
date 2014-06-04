@@ -1,6 +1,6 @@
 use lang::identifier::Identifier;
 use lang::value;
-use builtin::burn::implicit;
+use builtin::burn;
 use builtin::burn::errors::create_type_error;
 use mem::rc::Rc;
 use vm::run::rust;
@@ -119,11 +119,11 @@ pub fn divide( left: &value::Value, right: &value::Value ) -> rust::Result {
 
 pub fn union( left: value::Value, right: value::Value ) -> rust::Result {
 	
-	if ! implicit::is_type( &left ) {
+	if ! burn::types::is_type( &left ) {
 		return rust::Throw( create_type_error( format!( "Can't create type union: {} is not a type", left.repr() ) ) );
 	}
 	
-	if ! implicit::is_type( &right ) {
+	if ! burn::types::is_type( &right ) {
 		return rust::Throw( create_type_error( format!( "Can't create type union: {} is not a type", right.repr() ) ) );
 	}
 	

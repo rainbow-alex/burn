@@ -259,7 +259,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							
 							match result {
 								Ok( true ) => {
-									*fiber.frame.get_local_variable( 0 ) = throwable;
+									*fiber.frame.get_local_variable( 0 ) = throwable; // TODO this ain't right at all
 									fiber.set_flow( flow::Running );
 								},
 								Ok( false ) => {
