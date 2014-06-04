@@ -15,9 +15,16 @@ extern crate test;
 pub use api::*;
 mod api;
 
-#[macro_export]
 macro_rules! debug (
 	( $b:stmt ) => { if unsafe { ::DEBUG } { $b } }
+)
+
+macro_rules! todo (
+	() => { fail!(); }
+)
+
+macro_rules! impossible (
+	() => { fail!(); }
 )
 
 mod parse {

@@ -1,0 +1,13 @@
+let $foo = 3
+let $bar = function() {
+	$foo = $foo + 1
+}
+print $foo
+$bar()
+print $foo
+$bar()
+print $foo
+/* OUTPUTS
+3
+4
+5

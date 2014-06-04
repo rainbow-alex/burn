@@ -1,3 +1,5 @@
+#![feature(macro_rules)]
+
 extern crate burn;
 
 use std::os;
@@ -7,6 +9,14 @@ use burn::vm::Error;
 use burn::vm::VirtualMachine;
 use burn::vm::result;
 use burn::repl;
+
+macro_rules! todo (
+	() => { fail!(); }
+)
+
+macro_rules! impossible (
+	() => { fail!(); }
+)
 
 enum Input {
 	Stdin,
@@ -120,7 +130,7 @@ fn process_input( input: Input, args: Vec<String> ) {
 				Ok( s ) => {
 					let _ = writeln!( io::stderr(), "{}", s.get() );
 				}
-				_ => { fail!( "TODO" ); }
+				_ => { todo!(); }
 			};
 			os::set_exit_status( 2 );
 		}
@@ -171,7 +181,7 @@ fn repl() {
 					Ok( s ) => {
 						let _ = writeln!( io::stderr(), "{}", s.get() );
 					}
-					_ => { fail!( "TODO" ); }
+					_ => { todo!(); }
 				};
 			}
 		}

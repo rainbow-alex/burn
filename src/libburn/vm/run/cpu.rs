@@ -42,7 +42,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						fiber.push_frame( frame );
 					}
 					
-					_ => { fail!( "TODO" ); }
+					_ => { todo!(); }
 				}
 			}
 			
@@ -122,9 +122,9 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						opcode::Print => {
 							match fiber.pop_data().to_string() {
 								rust::Ok( value::String( s ) ) => println!( "{}", s.get() ),
-								rust::Ok( _ ) => { fail!(); }
+								rust::Ok( _ ) => { impossible!(); }
 								rust::Throw( t ) => { throw!( t ); }
-								_ => { fail!( "TODO" ); }
+								_ => { todo!(); }
 							};
 						}
 						
@@ -193,16 +193,16 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 									continue 'frame_loop;
 								}
 								
-								_ => { fail!( "TODO" ); }
+								_ => { todo!(); }
 							}
 						}
 						
 						opcode::TypeCheckLocal { index: _ } => {
-							fail!( "TODO" );
+							todo!();
 						}
 						
 						opcode::TypeCheckSharedLocal { index: _ } => {
-							fail!( "TODO" );
+							todo!();
 						}
 						
 						opcode::Return => {
@@ -259,7 +259,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							
 							match result {
 								Ok( true ) => {
-									*fiber.frame.get_local_variable( 0 ) = throwable; // TODO this ain't right at all
+									*fiber.frame.get_local_variable( 0 ) = throwable; // TODO this ain't right at all, it could also be shared, and isn't necessarily index 0
 									fiber.set_flow( flow::Running );
 								},
 								Ok( false ) => {
@@ -448,7 +448,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							let key = fiber.pop_data();
 							let expression = fiber.pop_data();
 							(key); (expression);
-							fail!( "TODO" );
+							todo!();
 						}
 						
 						// Operators
@@ -529,15 +529,15 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						}
 						
 						opcode::Not => {
-							fail!( "TODO" );
+							todo!();
 						}
 						
 						opcode::ShortCircuitAnd => {
-							fail!( "TODO" );
+							todo!();
 						}
 						
 						opcode::ShortCircuitOr => {
-							fail!( "TODO" );
+							todo!();
 						}
 						
 					} // match opcode

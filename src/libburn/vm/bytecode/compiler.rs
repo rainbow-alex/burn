@@ -127,6 +127,10 @@ struct Compilation {
 			}
 		}
 		
+		fn get_current_frame<'l>( &'l mut self ) -> &'l mut annotation::Frame {
+			self.frames.last().unwrap().get()
+		}
+		
 		fn create_placeholder( &mut self ) -> Placeholder {
 			let offset = self.code.opcodes.len();
 			self.code.opcodes.push( opcode::Nop );
@@ -202,15 +206,35 @@ struct Compilation {
 							
 							self.compile_expression( *rvalue );
 							
-							// TODO free variables!!
-							match variable.local_storage_type {
-								annotation::LocalStorage => {
-									self.code.opcodes.push( opcode::StoreLocal { index: variable.local_storage_index } );
-								}
-								annotation::SharedLocalStorage => {
-									self.code.opcodes.push( opcode::StoreSharedLocal { index: variable.local_storage_index } );
-								}
-							};
+							if variable.declared_in.get() == self.get_current_frame() {
+								
+								match variable.local_storage_type {
+									annotation::LocalStorage => {
+										self.code.opcodes.push( opcode::StoreLocal { index: variable.local_storage_index } );
+									}
+									annotation::SharedLocalStorage => {
+										self.code.opcodes.push( opcode::StoreSharedLocal { index: variable.local_storage_index } );
+									}
+								};
+								
+							} else {
+								
+								let bound_storage_index = {
+									let binding = self.get_current_frame().get_closure().bindings.iter().find( |b| {
+										b.variable.get() == variable
+									} ).unwrap();
+									binding.storage_index
+								};
+								
+								match variable.bound_storage_type {
+									annotation::StaticBoundStorage => {
+										self.code.opcodes.push( opcode::StoreStaticBound { index: bound_storage_index } );
+									}
+									annotation::SharedBoundStorage => {
+										self.code.opcodes.push( opcode::StoreSharedBound { index: bound_storage_index } );
+									}
+								};
+							}
 						}
 						
 						node::DotAccessLvalue {
