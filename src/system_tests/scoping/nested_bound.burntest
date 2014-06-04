@@ -1,0 +1,12 @@
+let $foo = 3
+let $bar = function() {
+	function() {
+		print $foo
+	}()
+}
+$bar()
+$foo = 4
+$bar()
+/* OUTPUTS
+3
+4

@@ -1,5 +1,5 @@
 use example
 print example
----
+/* OUTPUTS
 Example module!
 <Module>

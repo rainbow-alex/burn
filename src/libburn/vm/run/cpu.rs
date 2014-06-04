@@ -1,6 +1,7 @@
 use std::mem;
+use mem::rc::Rc;
 use lang::value;
-use lang::function::Function;
+use lang::function;
 use lang::operations;
 use vm::bytecode::opcode;
 use vm::result;
@@ -171,27 +172,29 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 									
 									fiber.frame.instruction += 1;
 									
-									fiber.push_frame( frame::Frame::new_function( function, n_arguments ) );
+									let mut locals = Vec::from_elem( function.get().definition.get().code.n_local_variables, value::Nothing );
+									let mut shared = Vec::from_fn( function.get().definition.get().code.n_shared_local_variables, |_| { Rc::new( value::Nothing ) } );
+									
+									let parameters = function.get().definition.get().parameters.as_slice();
+									assert!( n_arguments == parameters.len() );
+									for parameter in parameters.iter().rev() {
+										match parameter.storage {
+											function::LocalFunctionParameterStorage( i ) => {
+												*locals.get_mut( i ) = fiber.pop_data();
+											}
+											function::SharedLocalFunctionParameterStorage( i ) => {
+												*shared.get_mut( i ).get() = fiber.pop_data();
+											}
+										};
+									}
+									
+									fiber.push_frame( frame::Frame::new_function( function, locals, shared ) );
+									
 									continue 'frame_loop;
 								}
 								
 								_ => { fail!( "TODO" ); }
 							}
-						}
-						
-						opcode::ExtractArgs { min_parameters: min, max_parameters: max } => {
-							
-							let n = fiber.frame.get_n_arguments();
-							
-							if n < min {
-								fail!( "TODO" );
-							}
-							
-							if n > max {
-								fail!( "TODO" );
-							}
-							
-							fiber.frame.instruction = max - n;
 						}
 						
 						opcode::TypeCheckLocal { index: _ } => {
@@ -312,7 +315,26 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						// Values
 						
 						opcode::PushFunction { index: i } => {
-							let function = Function::new( fiber.frame.get_code().functions.get( i ).clone() );
+							
+							let mut function = function::Function::new( fiber.frame.get_code().functions.get( i ).clone() );
+							
+							for binding in function.definition.get().bindings.iter() {
+								match *binding {
+									function::LocalToStaticBinding( from, to ) => {
+										*function.static_bound_variables.get_mut( to ) = fiber.frame.get_local_variable( from ).clone();
+									}
+									function::LocalSharedToSharedBinding( from, to ) => {
+										*function.shared_bound_variables.get_mut( to ) = fiber.frame.get_shared_local_variable( from ).clone();
+									}
+									function::StaticToStaticBinding( from, to ) => {
+										*function.static_bound_variables.get_mut( to ) = fiber.frame.get_closure().static_bound_variables.get( from ).clone();
+									}
+									function::BoundSharedToSharedBinding( from, to ) => {
+										*function.shared_bound_variables.get_mut( to ) = fiber.frame.get_closure().shared_bound_variables.get( from ).clone();
+									}
+								}
+							}
+							
 							fiber.push_data(
 								value::Function(
 									vm.functions.register(
@@ -359,11 +381,11 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						}
 						
 						opcode::StoreSharedLocal { index: i } => {
-							*fiber.frame.get_shared_local_variable( i ) = fiber.pop_data();
+							*fiber.frame.get_shared_local_variable( i ).get() = fiber.pop_data();
 						}
 						
 						opcode::LoadSharedLocal { index: i } => {
-							let value = fiber.frame.get_shared_local_variable( i ).clone();
+							let value = fiber.frame.get_shared_local_variable( i ).get().clone();
 							fiber.push_data( value );
 						}
 						

@@ -2,7 +2,7 @@ use std::mem;
 use mem::raw::Raw;
 use mem::rc::Rc;
 use parse::{parser, node};
-use lang::function::FunctionDefinition;
+use lang::function;
 use lang::value;
 use vm::error::Error;
 use vm::bytecode::code::Code;
@@ -152,43 +152,19 @@ struct Compilation {
 			self.frames.pop();
 		}
 		
-		fn compile_function( &mut self, function: &mut node::Expression ) {
-			match *function {
-				
-				node::Function {
-					parameters: ref parameters,
-					frame: ref frame,
-					block: ref mut block,
-				} => {
-					
-					self.frames.push( Raw::new( frame ) );
-					
-					self.code.n_local_variables = frame.n_local_variables;
-					self.code.n_shared_local_variables = frame.n_shared_local_variables;
-					
-					self.code.opcodes.push( opcode::ExtractArgs { min_parameters: parameters.len(), max_parameters: parameters.len() } ); // TODO!
-					for parameter in parameters.iter().rev() {
-						let variable = parameter.variable.get();
-						match variable.local_storage_type {
-							annotation::LocalStorage => {
-								self.code.opcodes.push( opcode::StoreLocal { index: variable.local_storage_index } );
-							}
-							annotation::SharedLocalStorage => {
-								self.code.opcodes.push( opcode::StoreSharedLocal { index: variable.local_storage_index } );
-							}
-						}
-					}
-					
-					for statement in block.mut_iter() {
-						self.compile_statement( *statement );
-					}
-					self.code.opcodes.push( opcode::ReturnNothing );
-					
-					self.frames.pop();
-				}
-				
-				_ => { fail!(); }
+		fn compile_function( &mut self, frame: &annotation::Frame, block: &mut [Box<node::Statement>] ) {
+			
+			self.frames.push( Raw::new( frame ) );
+			
+			self.code.n_local_variables = frame.n_local_variables;
+			self.code.n_shared_local_variables = frame.n_shared_local_variables;
+			
+			for statement in block.mut_iter() {
+				self.compile_statement( *statement );
 			}
+			self.code.opcodes.push( opcode::ReturnNothing );
+			
+			self.frames.pop();
 		}
 		
 		fn compile_statement( &mut self, statement: &mut node::Statement ) {
@@ -733,13 +709,87 @@ struct Compilation {
 					self.fill_in_placeholder( placeholder, opcode::ShortCircuitOr );
 				}
 				
-				node::Function {..} => {
+				node::Function {
+					parameters: ref parameters,
+					frame: ref frame,
+					block: ref mut block,
+				} => {
 					
 					let mut compilation = Compilation::new();
-					compilation.compile_function( expression );
+					compilation.compile_function( frame, block.as_mut_slice() );
 					let code = compilation.code;
 					
-					let definition = Rc::new( FunctionDefinition::new( Vec::new(), code ) );
+					let mut parameter_definitions = Vec::<function::FunctionParameterDefinition>::new();
+					for parameter in parameters.iter() {
+						let variable = parameter.variable.get();
+						match variable.local_storage_type {
+							annotation::LocalStorage => {
+								parameter_definitions.push( function::FunctionParameterDefinition {
+									name: variable.name,
+									storage: function::LocalFunctionParameterStorage( variable.local_storage_index ),
+								} );
+							}
+							annotation::SharedLocalStorage => {
+								parameter_definitions.push( function::FunctionParameterDefinition {
+									name: variable.name,
+									storage: function::SharedLocalFunctionParameterStorage( variable.local_storage_index ),
+								} );
+							}
+						};
+					}
+					
+					let mut binding_definitions = Vec::<function::FunctionBindingDefinition>::new();
+					let current_frame = *self.frames.last().unwrap();
+					for binding in frame.closure.as_ref().unwrap().bindings.iter() {
+						let variable = binding.variable.get();
+						
+						// local to bound
+						if variable.declared_in == current_frame {
+							
+							match variable.bound_storage_type {
+								annotation::StaticBoundStorage => {
+									binding_definitions.push( function::LocalToStaticBinding(
+										variable.local_storage_index,
+										binding.storage_index
+									) );
+								}
+								annotation::SharedBoundStorage => {
+									binding_definitions.push( function::LocalSharedToSharedBinding(
+										variable.local_storage_index,
+										binding.storage_index
+									) );
+								}
+							};
+							
+						// bound to bound
+						} else {
+							
+							let current_binding = current_frame.get().closure.as_ref().unwrap().bindings.iter().find( |b| {
+								b.variable.get() == variable
+							} ).unwrap();
+							
+							match variable.bound_storage_type {
+								annotation::StaticBoundStorage => {
+									binding_definitions.push( function::StaticToStaticBinding(
+										current_binding.storage_index,
+										binding.storage_index
+									) );
+								}
+								annotation::SharedBoundStorage => {
+									binding_definitions.push( function::BoundSharedToSharedBinding(
+										current_binding.storage_index,
+										binding.storage_index
+									) );
+								}
+							};
+						}
+					}
+					
+					let definition = Rc::new( function::FunctionDefinition::new(
+						code,
+						parameter_definitions,
+						binding_definitions
+					) );
 					
 					self.code.opcodes.push( opcode::PushFunction { index: self.code.functions.len() } );
 					self.code.functions.push( definition );

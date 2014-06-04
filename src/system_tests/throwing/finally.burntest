@@ -3,7 +3,7 @@ try {
 } finally {
 	print "foo"
 }
----
+/* OUTPUTS
 foo
 Uncaught throwable:
 TypeError: Can't add <Integer> and <String>

@@ -5,5 +5,5 @@ if false {
 } else {
 	print "c"
 }
----
+/* OUTPUTS
 b

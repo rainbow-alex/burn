@@ -4,7 +4,7 @@ print 123
 print 0 is Integer
 print 3 is Integer
 print 123 is Integer
----
+/* OUTPUTS
 0
 3
 123

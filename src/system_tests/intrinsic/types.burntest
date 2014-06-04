@@ -6,7 +6,7 @@ print 3.2 is Number
 print "foo" is String
 print Integer is Type
 print Type is Type
----
+/* OUTPUTS
 true
 true
 true

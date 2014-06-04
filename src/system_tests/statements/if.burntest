@@ -4,5 +4,5 @@ if true {
 if false {
 	print "bar"
 }
----
+/* OUTPUTS
 foo

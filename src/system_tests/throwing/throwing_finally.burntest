@@ -4,6 +4,6 @@ try {
 	3 + "3"
 }
 print "foo"
----
+/* OUTPUTS
 Uncaught throwable:
 TypeError: Can't add <Integer> and <String>

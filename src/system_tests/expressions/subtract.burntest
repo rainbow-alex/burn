@@ -4,7 +4,7 @@ print 3.3 - 3.3
 print 3 - 3.3
 print 3.3 - 3
 print 3.1 - 1.1 is Float
----
+/* OUTPUTS
 0
 true
 0

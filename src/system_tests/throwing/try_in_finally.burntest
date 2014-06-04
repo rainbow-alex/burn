@@ -7,7 +7,7 @@ try {
 		print "caught"
 	}
 }
----
+/* OUTPUTS
 caught
 Uncaught throwable:
 TypeError: Can't add <Integer> and <String>

@@ -3,6 +3,6 @@ let $foo = function() {
 }
 $foo()
 $foo()
----
+/* OUTPUTS
 foo
 foo

@@ -13,7 +13,7 @@ try {
 } catch TypeError $e {
 	print "yes"
 }
----
+/* OUTPUTS
 caught?
 caught!
 yes

@@ -6,7 +6,6 @@ if true {
 	let $foo
 	print $foo
 }
-/*
----
+/* OUTPUTS
 3
 nothing

@@ -7,7 +7,7 @@ try {
 } finally {
 	print "bar"
 }
----
+/* OUTPUTS
 foo
 bar
 Uncaught throwable:

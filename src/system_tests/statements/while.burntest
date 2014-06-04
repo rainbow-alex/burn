@@ -3,7 +3,7 @@ while $i {
 	print "foo"
 	$i = $i - 1
 }
----
+/* OUTPUTS
 foo
 foo
 foo

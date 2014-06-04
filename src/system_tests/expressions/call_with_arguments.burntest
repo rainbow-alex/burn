@@ -3,6 +3,6 @@ let $foo = function( $a ) {
 }
 $foo( 1 )
 $foo( 2 )
----
+/* OUTPUTS
 1
 2

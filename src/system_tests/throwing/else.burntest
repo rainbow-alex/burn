@@ -22,7 +22,7 @@ try {
 } finally {
 	print "baz"
 }
----
+/* OUTPUTS
 foo
 bar
 baz

@@ -1,5 +1,5 @@
 print "foo"
 print "he said \"hi!\""
----
+/* OUTPUTS
 foo
 he said "hi!"

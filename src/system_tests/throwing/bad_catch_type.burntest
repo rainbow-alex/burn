@@ -4,7 +4,7 @@ try {
 } finally {
 	print "finally"
 }
----
+/* OUTPUTS
 finally
 Uncaught throwable:
 TypeError: <String> is not a type

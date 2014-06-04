@@ -22,7 +22,7 @@ def run_tests( file_or_directory ):
 		
 		print "%s ..." % file_or_directory,
 		
-		source, expected_output = open( file_or_directory ).read().split( "\n---\n", 2 )
+		source, expected_output = open( file_or_directory ).read().split( "\n/* OUTPUTS\n", 2 )
 		
 		process = subprocess.Popen(
 			"build/bin/burn -",

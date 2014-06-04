@@ -23,7 +23,6 @@ pub enum OpCode {
 	
 	// Function flow
 	Call { pub n_arguments: uint },
-	ExtractArgs { pub min_parameters: uint, pub max_parameters: uint },
 	TypeCheckLocal { pub index: uint },
 	TypeCheckSharedLocal { pub index: uint },
 	Return,
@@ -44,7 +43,6 @@ pub enum OpCode {
 	
 	// Values
 	PushFunction { pub index: uint },
-	//PushBoundBurnFunction { pub index: uint },
 	PushString { pub index: uint },
 	PushFloat { pub value: f64 },
 	PushInteger { pub value: i64 },
