@@ -130,6 +130,7 @@ pub fn union( left: value::Value, right: value::Value ) -> rust::Result {
 	rust::Ok( value::TypeUnion( Rc::new( ::lang::type_::TypeUnion::new( left, right ) ) ) )
 }
 
+// todo! rust result
 pub fn is( value: &value::Value, type_: &value::Value ) -> Result<bool,value::Value> {
 	match *type_ {
 		
@@ -156,41 +157,53 @@ pub fn is( value: &value::Value, type_: &value::Value ) -> Result<bool,value::Va
 		_ => {}
 	}
 	
-	return Err( create_type_error(
-		format!( "{} is not a type", type_.repr() )
-	) )
+	return Err(
+		create_type_error( format!( "{} is not a type", type_.repr() ) )
+	);
 }
 
 pub fn eq( left: &value::Value, right: &value::Value ) -> rust::Result {
-	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+	return rust::Throw(
+		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+	); 
 }
 
 pub fn neq( left: &value::Value, right: &value::Value ) -> rust::Result {
-	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+	return rust::Throw(
+		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+	); 
 }
 
 pub fn lt( left: &value::Value, right: &value::Value ) -> rust::Result {
-	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+	return rust::Throw(
+		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+	); 
 }
 
 pub fn gt( left: &value::Value, right: &value::Value ) -> rust::Result {
-	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+	return rust::Throw(
+		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+	); 
 }
 
 pub fn lt_eq( left: &value::Value, right: &value::Value ) -> rust::Result {
-	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+	return rust::Throw(
+		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+	); 
 }
 
 pub fn gt_eq( left: &value::Value, right: &value::Value ) -> rust::Result {
-	return rust::Throw( create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) ) ); 
+	return rust::Throw(
+		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+	); 
 }
 
 pub fn get_property( accessed: &value::Value, name: Identifier ) -> rust::Result {
 	(accessed); (name);
-	rust::Ok( value::Nothing ) // TODO
+	not_implemented!();
 }
 
 pub fn set_property( accessed: &value::Value, name: Identifier, value: &value::Value ) -> rust::Result {
 	(accessed); (name); (value);
-	rust::Ok( value::Nothing ) // TODO
+	not_implemented!();
 }

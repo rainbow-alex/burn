@@ -10,14 +10,6 @@ use burn::vm::VirtualMachine;
 use burn::vm::result;
 use burn::repl;
 
-macro_rules! todo (
-	() => { fail!(); }
-)
-
-macro_rules! impossible (
-	() => { fail!(); }
-)
-
 enum Input {
 	Stdin,
 	File( String ),
@@ -70,7 +62,7 @@ options:
 
 fn process_input( input: Input, args: Vec<String> ) {
 	
-	(args); // TODO
+	(args); // todo!
 	
 	let mut vm = VirtualMachine::new();
 	
@@ -130,7 +122,7 @@ fn process_input( input: Input, args: Vec<String> ) {
 				Ok( s ) => {
 					let _ = writeln!( io::stderr(), "{}", s.get() );
 				}
-				_ => { todo!(); }
+				_ => { fail!(); } // todo!
 			};
 			os::set_exit_status( 2 );
 		}
@@ -181,7 +173,7 @@ fn repl() {
 					Ok( s ) => {
 						let _ = writeln!( io::stderr(), "{}", s.get() );
 					}
-					_ => { todo!(); }
+					_ => { fail!(); } // todo!
 				};
 			}
 		}

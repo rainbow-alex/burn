@@ -35,7 +35,7 @@ pub struct Function {
 	impl GarbageCollected for Function {
 		
 		fn mark( &mut self ) {
-			// TODO
+			not_implemented!();
 		}
 	}
 
@@ -56,7 +56,7 @@ pub struct FunctionDefinition {
 			
 			let n_static_bound_variables = bindings.iter().filter( |b| {
 				match **b {
-					LocalToStaticBinding(..) | StaticToStaticBinding(..) => true,
+					LocalToStaticBoundBinding(..) | StaticBoundToStaticBoundBinding(..) => true,
 					_ => false,
 				}
 			} ).len();
@@ -83,8 +83,8 @@ pub enum FunctionParameterStorage {
 }
 
 pub enum FunctionBindingDefinition {
-	LocalToStaticBinding( uint, uint ),
-	LocalSharedToSharedBinding( uint, uint ),
-	StaticToStaticBinding( uint, uint ),
-	BoundSharedToSharedBinding( uint, uint ),
+	LocalToStaticBoundBinding( uint, uint ),
+	SharedLocalToSharedBoundBinding( uint, uint ),
+	StaticBoundToStaticBoundBinding( uint, uint ),
+	SharedBoundToSharedBoundBinding( uint, uint ),
 }

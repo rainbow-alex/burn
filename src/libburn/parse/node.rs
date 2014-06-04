@@ -222,6 +222,7 @@ pub enum Lvalue {
 	VariableLvalue {
 		pub name: Identifier,
 		pub annotation: Raw<annotation::Variable>,
+		pub source_offset: uint,
 	},
 	
 	DotAccessLvalue {

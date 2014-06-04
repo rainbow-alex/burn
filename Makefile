@@ -61,4 +61,8 @@ build/doc/api/burn/index.html: $(LIB_SRC)
 
 .PHONY: todo
 todo:
-	grep -HrnI --color -C1 TODO src
+	grep -HrnIi --color=always -C1 "todo!" src | sed "s/^/    /"
+	grep -HrnIi --color=always "refactor!" src | sed "s/^/    /"
+	grep -HrnIi --color=always "optimize!" src | sed "s/^/    /"
+	grep -HrnIi --color=always "not_implemented!" src | sed "s/^/    /"
+	grep -HrnIi --color=always ".\{101,\}" src/libburn/ | sed "s/^/    /"

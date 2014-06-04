@@ -142,13 +142,16 @@ pub struct AnalyzeResolution {
 					variable_name: name,
 					annotation: ref mut annotation,
 					default: _,
-					source_offset: _,
+					source_offset: source_offset,
 				} => {
 					
-					for variable in self.get_current_scope().declared_variables.iter() {
-						if name == variable.get().name {
-							fail!( "Double declaration" ); // TODO
-						}
+					let is_duplicate = self.get_current_scope().declared_variables.iter().find( |v| { v.get().name == name } ).is_some();
+					
+					if is_duplicate {
+						self.errors.push( AnalysisError {
+							message: format!( "Duplicate declaration of ${}", name ),
+							source_offset: source_offset,
+						} );
 					}
 					
 					*annotation = self.declare_variable( name );
@@ -171,8 +174,8 @@ pub struct AnalyzeResolution {
 					path: _,
 					annotation: ref mut annotation,
 				} => {
-					// TODO check for double name
-					self.scopes.mut_last().unwrap().used.push( Raw::new( annotation ) );
+					// todo! check for duplicate use
+					self.get_current_scope().used.push( Raw::new( annotation ) );
 				}
 				
 				node::ExpressionStatement { expression: ref mut expression }
@@ -456,6 +459,7 @@ pub struct AnalyzeResolution {
 				node::VariableLvalue {
 					name: name,
 					annotation: ref mut annotation,
+					source_offset: source_offset,
 				} => {
 					match self.find_variable( name ) {
 						Ok( variable ) => {
@@ -464,7 +468,7 @@ pub struct AnalyzeResolution {
 						Err(..) => {
 							self.errors.push( AnalysisError {
 								message: format!( "Variable not found: ${}.", name ),
-								source_offset: 0, // TODO
+								source_offset: source_offset,
 							} );
 						}
 					}
@@ -485,6 +489,7 @@ pub struct AnalyzeResolution {
 				node::VariableLvalue {
 					name: _,
 					annotation: ref mut annotation,
+					source_offset: _,
 				} => {
 					self.write_variable( annotation.get() );
 				}

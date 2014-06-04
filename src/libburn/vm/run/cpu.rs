@@ -16,7 +16,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 	'frame_loop: loop {
 	if fiber.frame.is_rust() {
 		
-		match fiber.flow.clone() { // TODO
+		match fiber.flow.clone() { // optimize! get rid of this clone
 			
 			flow::Running => {
 				
@@ -24,7 +24,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 					flow::Running => Ok( value::Nothing ),
 					flow::Returning( v ) => Ok( v ),
 					flow::Throwing( v ) => Err( v ),
-					_ => fail!(),
+					_ => { impossible!() },
 				};
 				
 				match fiber.frame.get_rust_operation().run( vm, result ) {
@@ -42,7 +42,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						fiber.push_frame( frame );
 					}
 					
-					_ => { todo!(); }
+					_ => { not_implemented!(); }
 				}
 			}
 			
@@ -110,7 +110,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 									fiber.push_frame( frame );
 									continue 'frame_loop;
 								}
-								_ => { fail!(); } // TODO
+								_ => { not_implemented!(); }
 							};
 						}}
 					)
@@ -124,7 +124,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 								rust::Ok( value::String( s ) ) => println!( "{}", s.get() ),
 								rust::Ok( _ ) => { impossible!(); }
 								rust::Throw( t ) => { throw!( t ); }
-								_ => { todo!(); }
+								_ => { not_implemented!(); }
 							};
 						}
 						
@@ -193,16 +193,16 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 									continue 'frame_loop;
 								}
 								
-								_ => { todo!(); }
+								_ => { not_implemented!(); }
 							}
 						}
 						
 						opcode::TypeCheckLocal { index: _ } => {
-							todo!();
+							not_implemented!();
 						}
 						
 						opcode::TypeCheckSharedLocal { index: _ } => {
-							todo!();
+							not_implemented!();
 						}
 						
 						opcode::Return => {
@@ -247,19 +247,23 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							}
 						}
 						
+						/*
+						opcode::CatchLocalOrJump { storage_index: i, instruction: instruction } => {
+						opcode::CatchSharedOrJump { storage_index: i, instruction: instruction } => {
+						opcode::CatchLocal { storage_index: i } => {
+						opcode::CatchShared { storage_index: i } => {
+						*/
+						
 						opcode::CatchOrJump { instruction: i } => {
 							
-							let throwable = match fiber.flow {
-								flow::Catching( ref t ) => t.clone(), // ref+clone because of rust#6393
-								_ => fail!(),
-							};
-							
+							// optimize! get rid of this clone
+							let throwable = unwrap_enum!( fiber.flow to flow::Catching( ref t ) => { t.clone() } );
 							let type_ = fiber.pop_data();
-							let result = operations::is( &throwable, &type_ );
 							
-							match result {
+							match operations::is( &throwable, &type_ ) {
 								Ok( true ) => {
-									*fiber.frame.get_local_variable( 0 ) = throwable; // TODO this ain't right at all, it could also be shared, and isn't necessarily index 0
+									// todo! this ain't right at all, it could also be shared, and isn't necessarily index 0
+									*fiber.frame.get_local_variable( 0 ) = throwable;
 									fiber.set_flow( flow::Running );
 								},
 								Ok( false ) => {
@@ -320,16 +324,16 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							
 							for binding in function.definition.get().bindings.iter() {
 								match *binding {
-									function::LocalToStaticBinding( from, to ) => {
+									function::LocalToStaticBoundBinding( from, to ) => {
 										*function.static_bound_variables.get_mut( to ) = fiber.frame.get_local_variable( from ).clone();
 									}
-									function::LocalSharedToSharedBinding( from, to ) => {
+									function::SharedLocalToSharedBoundBinding( from, to ) => {
 										*function.shared_bound_variables.get_mut( to ) = fiber.frame.get_shared_local_variable( from ).clone();
 									}
-									function::StaticToStaticBinding( from, to ) => {
+									function::StaticBoundToStaticBoundBinding( from, to ) => {
 										*function.static_bound_variables.get_mut( to ) = fiber.frame.get_closure().static_bound_variables.get( from ).clone();
 									}
-									function::BoundSharedToSharedBinding( from, to ) => {
+									function::SharedBoundToSharedBoundBinding( from, to ) => {
 										*function.shared_bound_variables.get_mut( to ) = fiber.frame.get_closure().shared_bound_variables.get( from ).clone();
 									}
 								}
@@ -448,7 +452,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							let key = fiber.pop_data();
 							let expression = fiber.pop_data();
 							(key); (expression);
-							todo!();
+							not_implemented!();
 						}
 						
 						// Operators
@@ -529,15 +533,15 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						}
 						
 						opcode::Not => {
-							todo!();
+							not_implemented!();
 						}
 						
 						opcode::ShortCircuitAnd => {
-							todo!();
+							not_implemented!();
 						}
 						
 						opcode::ShortCircuitOr => {
-							todo!();
+							not_implemented!();
 						}
 						
 					} // match opcode

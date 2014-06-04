@@ -201,6 +201,7 @@ struct Compilation {
 						node::VariableLvalue {
 							name: _,
 							annotation: ref variable,
+							source_offset: _,
 						} => {
 							let variable = variable.get();
 							
@@ -378,7 +379,9 @@ struct Compilation {
 					let jump = opcode::JumpIfPopFalsy { instruction: self.code.opcodes.len() };
 					self.fill_in_placeholder( test_opcode, jump );
 					
-					assert!( else_clause.is_none() ); // TODO
+					if else_clause.is_some() {
+						not_implemented!();
+					}
 				}
 				
 				node::Try {
@@ -772,13 +775,13 @@ struct Compilation {
 							
 							match variable.bound_storage_type {
 								annotation::StaticBoundStorage => {
-									binding_definitions.push( function::LocalToStaticBinding(
+									binding_definitions.push( function::LocalToStaticBoundBinding(
 										variable.local_storage_index,
 										binding.storage_index
 									) );
 								}
 								annotation::SharedBoundStorage => {
-									binding_definitions.push( function::LocalSharedToSharedBinding(
+									binding_definitions.push( function::SharedLocalToSharedBoundBinding(
 										variable.local_storage_index,
 										binding.storage_index
 									) );
@@ -794,13 +797,13 @@ struct Compilation {
 							
 							match variable.bound_storage_type {
 								annotation::StaticBoundStorage => {
-									binding_definitions.push( function::StaticToStaticBinding(
+									binding_definitions.push( function::StaticBoundToStaticBoundBinding(
 										current_binding.storage_index,
 										binding.storage_index
 									) );
 								}
 								annotation::SharedBoundStorage => {
-									binding_definitions.push( function::BoundSharedToSharedBinding(
+									binding_definitions.push( function::SharedBoundToSharedBoundBinding(
 										current_binding.storage_index,
 										binding.storage_index
 									) );

@@ -11,6 +11,7 @@ extern crate core;
 extern crate collections;
 #[cfg(test)]
 extern crate test;
+extern crate debug;
 
 pub use api::*;
 mod api;
@@ -19,12 +20,21 @@ macro_rules! debug (
 	( $b:stmt ) => { if unsafe { ::DEBUG } { $b } }
 )
 
-macro_rules! todo (
+macro_rules! not_implemented (
 	() => { fail!(); }
 )
 
 macro_rules! impossible (
 	() => { fail!(); }
+)
+
+macro_rules! unwrap_enum (
+	( $e:expr to $p:pat => $b:block ) => {
+		match $e {
+			$p => $b,
+			_ => { impossible!(); }
+		};
+	}
 )
 
 mod parse {

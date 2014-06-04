@@ -30,7 +30,7 @@ pub struct Fiber {
 		}
 		
 		pub fn push_frame( &mut self, frame: Frame ) {
-			// TODO move this logic into a cpu macro?
+			// refactor! move this logic into a cpu macro?
 			let is_running = match self.flow {
 				flow::Running => true,
 				_ => false,

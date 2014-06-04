@@ -59,7 +59,7 @@ pub struct Module {
 		pub fn find_id( &self, identifier: Identifier ) -> Result<value::Value, value::Value> {
 			match self.contents.find( &identifier ) {
 				Some( value ) => Ok( value.clone() ),
-				None => Err( value::Nothing ), // TODO
+				None => Err( value::Nothing ), // todo! add a real error
 			}
 		}
 		
@@ -140,6 +140,7 @@ pub struct Use {
 									self.loaded = value::Module( Raw::new( module ) );
 									vm.module_root.add_module_with_id( name, module );
 									
+									// todo! read the json
 									self.root_sources.push( Path::new( "modules/example/src/example.burn" ) );
 									
 									self.step = ImportRoot;
@@ -162,7 +163,7 @@ pub struct Use {
 									Ok( frame ) => rust::Burn( frame ),
 									Err( errors ) => {
 										(errors);
-										return rust::Throw( value::Integer( 5 ) ); // TODO
+										return rust::Throw( value::Nothing ); // todo! add a real error
 									}
 								}
 							}
