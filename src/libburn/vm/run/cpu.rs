@@ -1,3 +1,4 @@
+use std::mem;
 use lang::value;
 use lang::function::Function;
 use lang::operations;
@@ -161,29 +162,44 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						
 						opcode::Call { n_arguments: n_arguments } => {
 							
-							let args_offset = fiber.data_stack.len() - n_arguments;
-							let args_ptr = unsafe { fiber.data_stack.as_ptr().offset( args_offset as int ) };
-							unsafe { fiber.data_stack.set_len( args_offset ) }
+							let function_offset = fiber.data_stack.len() - n_arguments - 1;
+							let function = mem::replace( fiber.data_stack.get_mut( function_offset ), value::Nothing );
 							
-							match fiber.pop_data() {
+							match function {
 								
 								value::Function( function ) => {
 									
-									assert!( n_arguments == 0 ); // TODO
-									(args_ptr);
-									
 									fiber.frame.instruction += 1;
-									fiber.flow_points.push( flow::PopFrame { data_stack_len: fiber.data_stack.len() } );
 									
-									let locals = Vec::new();
-									let shared = Vec::new();
-									
-									fiber.push_frame( frame::Frame::new_function( function, locals, shared ) );
+									fiber.push_frame( frame::Frame::new_function( function, n_arguments ) );
 									continue 'frame_loop;
 								}
 								
-								_ => { fail!(); } // TODO
+								_ => { fail!( "TODO" ); }
 							}
+						}
+						
+						opcode::ExtractArgs { min_parameters: min, max_parameters: max } => {
+							
+							let n = fiber.frame.get_n_arguments();
+							
+							if n < min {
+								fail!( "TODO" );
+							}
+							
+							if n > max {
+								fail!( "TODO" );
+							}
+							
+							fiber.frame.instruction = max - n;
+						}
+						
+						opcode::TypeCheckLocal { index: _ } => {
+							fail!( "TODO" );
+						}
+						
+						opcode::TypeCheckSharedLocal { index: _ } => {
+							fail!( "TODO" );
 						}
 						
 						opcode::Return => {

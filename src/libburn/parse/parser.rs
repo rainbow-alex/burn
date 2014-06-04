@@ -694,10 +694,12 @@ struct Parsing<'src> {
 					
 					token::LeftParenthesis => {
 						self.read();
-						self.read(); // TODO
+						let arguments = unwrap_or_return_err!( self.parse_arguments() );
+						let close = self.read();
+						assert!( close == token::RightParenthesis );
 						expression = box node::Call {
 							expression: expression,
-							arguments: Vec::new(),
+							arguments: arguments,
 						};
 					}
 					
@@ -706,6 +708,36 @@ struct Parsing<'src> {
 			}
 			
 			Ok( expression )
+		}
+		
+		fn parse_arguments( &mut self ) -> ParseResult<Vec<Box<node::Expression>>> {
+			
+			if self.peek() == token::RightParenthesis {
+				return Ok( Vec::new() );
+			}
+			
+			let mut arguments = Vec::<Box<node::Expression>>::new();
+			
+			loop {
+				
+				arguments.push( unwrap_or_return_err!( self.parse_expression() ) );
+				
+				match self.peek() {
+					
+					token::Comma => {
+						self.read();
+						continue;
+					}
+					
+					token::RightParenthesis => {
+						return Ok( arguments );
+					}
+					
+					_ => {
+						return Err( self.err( "Expected `)`.".to_string() ) );
+					}
+				}
+			}
 		}
 		
 		fn parse_atom_expression( &mut self ) -> ParseResult<Box<node::Expression>> {
@@ -833,7 +865,7 @@ struct Parsing<'src> {
 			loop {
 				let type_ = match self.peek() {
 					token::Variable(..) => match self.peek_n(1) {
-						token::Equals | token::Comma => None,
+						token::Equals | token::Comma | token::RightParenthesis => None,
 						_ => Some( unwrap_or_return_err!( self.parse_expression() ) ),
 					},
 					_ => Some( unwrap_or_return_err!( self.parse_expression() ) ),

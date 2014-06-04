@@ -23,6 +23,9 @@ pub enum OpCode {
 	
 	// Function flow
 	Call { pub n_arguments: uint },
+	ExtractArgs { pub min_parameters: uint, pub max_parameters: uint },
+	TypeCheckLocal { pub index: uint },
+	TypeCheckSharedLocal { pub index: uint },
 	Return,
 	ReturnNothing,
 	

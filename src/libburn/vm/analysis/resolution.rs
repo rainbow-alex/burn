@@ -56,6 +56,22 @@ pub struct AnalyzeResolution {
 			self.scopes.mut_last().unwrap()
 		}
 		
+		fn get_current_frame<'l>( &'l mut self ) -> &'l mut annotation::Frame {
+			self.frames.mut_last().unwrap().get()
+		}
+		
+		fn declare_variable( &mut self, name: Identifier ) -> Raw<annotation::Variable> {
+			
+			let mut variable = box annotation::Variable::new( name );
+			let ptr = Raw::new( variable );
+			
+			variable.declared_in = Raw::new( self.get_current_frame() );
+			self.get_current_scope().declared_variables.push( ptr );
+			self.get_current_frame().declared_variables.push( variable );
+			
+			ptr
+		}
+		
 		fn find_variable( &mut self, name: Identifier ) -> Result<Raw<annotation::Variable>,()> {
 			
 			for scope in self.scopes.iter().rev() {
@@ -98,10 +114,7 @@ pub struct AnalyzeResolution {
 			
 			// put repl_state vars into the root scope
 			for &name in repl_state.variables.keys() {
-				let mut var = box annotation::Variable::new( name );
-				var.declared_in = Raw::new( &root.frame );
-				self.get_current_scope().declared_variables.push( Raw::new( var ) );
-				root.frame.declared_variables.push( var );
+				self.declare_variable( name );
 			}
 			
 			self.find_declarations_in_block( &mut root.statements );
@@ -132,23 +145,13 @@ pub struct AnalyzeResolution {
 					source_offset: _,
 				} => {
 					
-					let current_scope = self.scopes.mut_last().unwrap();
-					
-					for variable in current_scope.declared_variables.iter() {
+					for variable in self.get_current_scope().declared_variables.iter() {
 						if name == variable.get().name {
 							fail!( "Double declaration" ); // TODO
 						}
 					}
 					
-					let mut variable = box annotation::Variable::new( name );
-					
-					*annotation = Raw::new( variable );
-					
-					current_scope.declared_variables.push( Raw::new( variable ) );
-					
-					let current_frame = self.frames.mut_last().unwrap().get();
-					variable.declared_in = Raw::new( current_frame );
-					current_frame.declared_variables.push( variable );
+					*annotation = self.declare_variable( name );
 				}
 				
 				_ => {}
@@ -290,13 +293,7 @@ pub struct AnalyzeResolution {
 						
 						self.push_scope();
 						
-						let mut variable = box annotation::Variable::new( catch_clause.variable_name );
-						variable.declared_in = *self.frames.last().unwrap();
-						
-						catch_clause.variable = Raw::new( variable );
-						self.scopes.mut_last().unwrap().declared_variables.push( Raw::new( variable ) );
-						self.frames.mut_last().unwrap().get().declared_variables.push( variable );
-						
+						self.declare_variable( catch_clause.variable_name );
 						self.find_declarations_in_block( &mut catch_clause.block );
 						self.analyze_block( &mut catch_clause.block );
 						
@@ -329,6 +326,9 @@ pub struct AnalyzeResolution {
 		}
 		
 		fn analyze_expression( &mut self, expression: &mut node::Expression ) {
+			
+			let expression_ptr = Raw::new( expression );
+			
 			match *expression {
 				
 				node::Nothing
@@ -419,6 +419,7 @@ pub struct AnalyzeResolution {
 					frame: ref mut frame,
 					block: ref mut block,
 				} => {
+					self.get_current_frame().functions.push( expression_ptr );
 					
 					self.push_frame( frame );
 					
@@ -438,6 +439,9 @@ pub struct AnalyzeResolution {
 					}
 					
 					self.push_scope();
+					for parameter in parameters.mut_iter() {
+						parameter.variable = self.declare_variable( parameter.variable_name );
+					}
 					self.find_declarations_in_block( block );
 					self.analyze_block( block );
 					self.pop_scope();
@@ -490,7 +494,7 @@ pub struct AnalyzeResolution {
 		}
 		
 		fn read_variable( &mut self, variable: &mut annotation::Variable ) {
-			if self.frames.last().unwrap().get() == variable.declared_in.get() {
+			if self.get_current_frame() == variable.declared_in.get() {
 				variable.reads.push( annotation::ReadVariable { time: self.tick() } );
 			} else {
 				self.bind_variable( variable, false );
@@ -498,7 +502,7 @@ pub struct AnalyzeResolution {
 		}
 		
 		fn write_variable( &mut self, variable: &mut annotation::Variable ) {
-			if self.frames.last().unwrap().get() == variable.declared_in.get() {
+			if self.get_current_frame() == variable.declared_in.get() {
 				variable.writes.push( annotation::WriteVariable { time: self.tick() } );
 			} else {
 				self.bind_variable( variable, true );
