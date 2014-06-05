@@ -301,7 +301,7 @@ pub struct AnalyzeResolution {
 						
 						self.push_scope();
 						
-						self.declare_variable( catch_clause.variable_name );
+						catch_clause.variable = self.declare_variable( catch_clause.variable_name );
 						self.find_declarations_in_block( &mut catch_clause.block );
 						self.analyze_block( &mut catch_clause.block );
 						

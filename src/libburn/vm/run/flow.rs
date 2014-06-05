@@ -1,13 +1,23 @@
-use lang::value;
+use lang::value::Value;
 
 #[deriving(Clone)]
 pub enum Flow {
 	Running,
-	Catching( value::Value ),
-	Throwing( value::Value ),
-	Returning( value::Value ),
+	Catching( Value ),
+	Throwing( Value ),
+	Returning( Value ),
 	Jumping { pub n_flow_points: uint, pub instruction: uint },
 }
+
+	impl Flow {
+		
+		pub fn unwrap_throwable( self ) -> Value {
+			match self {
+				Catching( v ) | Throwing( v ) => v,
+				_ => { unreachable!(); }
+			}
+		}
+	}
 
 pub enum FlowPoint {
 	StartCatch { pub instruction: uint },

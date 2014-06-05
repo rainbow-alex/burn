@@ -2,6 +2,8 @@ use lang::value;
 use lang::identifier::Identifier;
 use mem::rc::{Rc, RefCounted};
 
+// todo! rust results
+
 pub trait Special {
 	fn repr( &self ) -> String;
 	fn to_string( &self ) -> String { self.repr() }

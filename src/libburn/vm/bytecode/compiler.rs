@@ -452,9 +452,11 @@ struct Compilation {
 						for catch_clause in catch_clauses.mut_iter() {
 							
 							let has_type = catch_clause.type_.is_some();
+							let variable = catch_clause.variable.as_mut();
 							
 							if has_type {
 								self.compile_expression( *catch_clause.type_.as_mut().unwrap() );
+								self.code.opcodes.push( opcode::ThrownIs );
 							}
 							
 							let catch = self.create_placeholder();
@@ -466,10 +468,39 @@ struct Compilation {
 							end_catch.push( self.create_placeholder() );
 							
 							let opcode = if has_type {
-								opcode::CatchOrJump { instruction: self.code.opcodes.len() }
+								
+								match variable.local_storage_type {
+									annotation::storage::Local => {
+										opcode::CatchLocalOrJump {
+											storage_index: variable.local_storage_index,
+											instruction: self.code.opcodes.len(),
+										}
+									}
+									annotation::storage::SharedLocal => {
+										opcode::CatchSharedLocalOrJump {
+											storage_index: variable.local_storage_index,
+											instruction: self.code.opcodes.len(),
+										}
+									}
+								}
+								
 							} else {
-								opcode::Catch
+								
+								match variable.local_storage_type {
+									annotation::storage::Local => {
+										opcode::CatchLocal {
+											storage_index: variable.local_storage_index,
+										}
+									}
+									annotation::storage::SharedLocal => {
+										opcode::CatchSharedLocal {
+											storage_index: variable.local_storage_index,
+										}
+									}
+								}
+								
 							};
+							
 							self.fill_in_placeholder( catch, opcode );
 						}
 						

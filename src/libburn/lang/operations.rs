@@ -45,20 +45,22 @@ pub fn repr( value: &Value ) -> String {
 }
 
 pub fn to_string( value: &Value ) -> rust::Result {
-	match *value {
-		
-		value::Nothing => rust::Ok( value::String( Rc::new( "nothing".into_string() ) ) ),
-		value::Boolean( true ) => rust::Ok( value::String( Rc::new( "true".into_string() ) ) ),
-		value::Boolean( false ) => rust::Ok( value::String( Rc::new( "false".into_string() ) ) ),
-		value::Integer( i ) => rust::Ok( value::String( Rc::new( format!( "{}", i ) ) ) ),
-		value::Float( f ) => rust::Ok( value::String( Rc::new( format!( "{}", f ) ) ) ),
-		value::String( ref s ) => rust::Ok( value::String( s.clone() ) ),
-		
-		value::StaticSpecial( special ) => rust::Ok( value::String( Rc::new( special.repr() ) ) ),
-		value::RcSpecial( ref r ) => rust::Ok( value::String( Rc::new( r.borrow().borrow().to_string() ) ) ),
-		
-		_ => { rust::Ok( value::String( Rc::new( value.repr() ) ) ) }
-	}
+	rust::Ok( value::String(
+		match *value {
+			
+			value::Nothing => Rc::new( "nothing".into_string() ),
+			value::Boolean( true ) => Rc::new( "true".into_string() ),
+			value::Boolean( false ) => Rc::new( "false".into_string() ),
+			value::Integer( i ) => Rc::new( format!( "{}", i ) ),
+			value::Float( f ) => Rc::new( format!( "{}", f ) ),
+			value::String( ref s ) => s.clone(),
+			
+			value::StaticSpecial( special ) => Rc::new( special.repr() ),
+			value::RcSpecial( ref r ) => Rc::new( r.borrow().borrow().to_string() ),
+			
+			_ => { Rc::new( value.repr() ) }
+		}
+	) )
 }
 
 pub fn add( left: &Value, right: &Value ) -> rust::Result {
@@ -144,34 +146,32 @@ pub fn union( left: Value, right: Value ) -> rust::Result {
 	rust::Ok( value::TypeUnion( Rc::new( ::lang::type_::TypeUnion::new( left, right ) ) ) )
 }
 
-// todo! rust result
-pub fn is( value: &Value, type_: &Value ) -> Result<bool,Value> {
+pub fn is( value: &Value, type_: &Value ) -> rust::Result {
 	match *type_ {
 		
 		value::TypeUnion( ref r ) => {
 			return match is( value, &r.borrow().left ) {
-				Ok( true ) => Ok( true ),
-				Ok( false ) => is( value, &r.borrow().right ),
-				Err( e ) => Err( e ),
+				rust::Ok( value::Boolean( false ) ) => is( value, &r.borrow().right ),
+				other_result @ _ => other_result,
 			}
 		}
 		
 		value::StaticSpecial( special ) => {
 			if special.is_type() {
-				return Ok( special.type_test( value ) )
+				return rust::Ok( value::Boolean( special.type_test( value ) ) )
 			}
 		}
 		
 		value::RcSpecial( ref r ) => {
 			if r.borrow().borrow().is_type() {
-				return Ok( r.borrow().borrow().type_test( value ) )
+				return rust::Ok( value::Boolean( r.borrow().borrow().type_test( value ) ) )
 			}
 		}
 		
 		_ => {}
 	}
 	
-	return Err(
+	return rust::Throw(
 		create_type_error( format!( "{} is not a type", type_.repr() ) )
 	);
 }

@@ -2,6 +2,7 @@ use collections::HashMap;
 use mem::raw::Raw;
 use lang::identifier::Identifier;
 use lang::value;
+use lang::value::Value;
 use vm::bytecode::code::Code;
 use vm::bytecode::compiler;
 use vm::bytecode::opcode;
@@ -11,7 +12,7 @@ use vm::virtual_machine::VirtualMachine;
 
 pub struct Module {
 	modules: HashMap<Identifier, Box<Module>>,
-	contents: HashMap<Identifier, value::Value>,
+	contents: HashMap<Identifier, Value>,
 	locked: bool,
 }
 
@@ -34,11 +35,11 @@ pub struct Module {
 			self.modules.insert( name, module );
 		}
 		
-		pub fn add( &mut self, name: &'static str, value: value::Value ) {
+		pub fn add( &mut self, name: &'static str, value: Value ) {
 			self.add_with_id( Identifier::find_or_create( name ), value );
 		}
 		
-		pub fn add_with_id( &mut self, name: Identifier, value: value::Value ) {
+		pub fn add_with_id( &mut self, name: Identifier, value: Value ) {
 			assert!( ! self.locked );
 			self.contents.insert( name, value );
 		}
@@ -56,18 +57,18 @@ pub struct Module {
 			self.locked = true
 		}
 		
-		pub fn find_id( &self, identifier: Identifier ) -> Result<value::Value, value::Value> {
+		pub fn find_id( &self, identifier: Identifier ) -> Result<Value, Value> {
 			match self.contents.find( &identifier ) {
 				Some( value ) => Ok( value.clone() ),
 				None => Err( value::Nothing ), // todo! add a real error
 			}
 		}
 		
-		pub fn get( &self, name: &'static str ) -> value::Value {
+		pub fn get( &self, name: &'static str ) -> Value {
 			self.get_id( Identifier::find_or_create( name ) )
 		}
 		
-		pub fn get_id( &self, name: Identifier ) -> value::Value {
+		pub fn get_id( &self, name: Identifier ) -> Value {
 			match self.contents.find( &name ) {
 				Some( value ) => value.clone(),
 				None => { fail!(); },
@@ -87,7 +88,7 @@ pub struct Use {
 	inlines: Vec<(Raw<Code>, uint)>,
 	step: UseOperationStep,
 	root_sources: Vec<Path>,
-	loaded: value::Value,
+	loaded: Value,
 }
 
 	impl Use {
@@ -115,7 +116,7 @@ pub struct Use {
 	}
 	
 	impl Operation for Use {
-		fn run( &mut self, vm: &mut VirtualMachine, value: Result<value::Value, value::Value> ) -> rust::Result {
+		fn run( &mut self, vm: &mut VirtualMachine, value: Result<Value, Value> ) -> rust::Result {
 			'step_loop: loop {
 				match self.step {
 				

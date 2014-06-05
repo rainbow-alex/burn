@@ -256,44 +256,52 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							}
 						}
 						
-						/*
-						todo!
-						opcode::CatchLocalOrJump { storage_index: i, instruction: instruction } => {
-						opcode::CatchSharedOrJump { storage_index: i, instruction: instruction } => {
-						opcode::CatchLocal { storage_index: i } => {
-						opcode::CatchShared { storage_index: i } => {
-						*/
-						
-						opcode::CatchOrJump { instruction: i } => {
+						opcode::ThrownIs => {
 							
-							// optimize! get rid of this clone
-							let throwable = match_enum!( fiber.flow to flow::Catching( ref t ) => { t.clone() } );
-							let type_ = fiber.pop_data();
-							
-							match operations::is( &throwable, &type_ ) {
-								Ok( true ) => {
-									// todo! this ain't right at all, it could also be shared, and isn't necessarily index 0
-									*fiber.frame.get_local_variable( 0 ) = throwable;
-									fiber.set_flow( flow::Running );
-								},
-								Ok( false ) => {
-									fiber.frame.instruction = i;
-									fiber.set_flow( flow::Catching( throwable ) );
-									continue 'instruction_loop;
-								}
-								Err( e ) => { throw!( e ); }
-							}
-						}
-						
-						opcode::Catch => {
-							
-							let throwable = match fiber.flow {
-								flow::Catching( ref t ) => t.clone(), // ref+clone because of rust#6393
-								_ => fail!(),
+							// we only borrow the throwable, so we have to limit its lifetime
+							let result = {
+								let type_ = fiber.pop_data();
+								let throwable = match_enum!( fiber.flow to flow::Catching( ref t ) => { t } );
+								operations::is( throwable, &type_ )
 							};
 							
-							*fiber.frame.get_local_variable( 0 ) = throwable;
-							fiber.set_flow( flow::Running );
+							handle_operation_result!( result );
+						}
+						
+						opcode::CatchLocalOrJump { storage_index: s_i, instruction: i } => {
+							match fiber.pop_data() {
+								value::Boolean( true ) => {
+									let throwable = fiber.replace_flow( flow::Running ).unwrap_throwable();
+									*fiber.frame.get_local_variable( s_i ) = throwable;
+								}
+								_ => {
+									fiber.frame.instruction = i;
+									continue 'instruction_loop;
+								}
+							};
+						}
+						
+						opcode::CatchSharedLocalOrJump { storage_index: s_i, instruction: i } => {
+							match fiber.pop_data() {
+								value::Boolean( true ) => {
+									let throwable = fiber.replace_flow( flow::Running ).unwrap_throwable();
+									*fiber.frame.get_shared_local_variable( s_i ) = Rc::new( throwable );
+								}
+								_ => {
+									fiber.frame.instruction = i;
+									continue 'instruction_loop;
+								}
+							};
+						}
+						
+						opcode::CatchLocal { storage_index: s_i } => {
+							let throwable = fiber.replace_flow( flow::Running ).unwrap_throwable();
+							*fiber.frame.get_local_variable( s_i ) = throwable;
+						}
+						
+						opcode::CatchSharedLocal { storage_index: s_i } => {
+							let throwable = fiber.replace_flow( flow::Running ).unwrap_throwable();
+							*fiber.frame.get_shared_local_variable( s_i ) = Rc::new( throwable );
 						}
 						
 						opcode::Rethrow => {
@@ -501,10 +509,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						opcode::Is => {
 							let right = fiber.pop_data();
 							let left = fiber.pop_data();
-							match operations::is( &left, &right ) {
-								Ok( result ) => { fiber.push_data( value::Boolean( result ) ); }
-								Err( err ) => { throw!( err ); }
-							};
+							handle_operation_result!( operations::is( &left, &right ) );
 						}
 						
 						opcode::Eq => {
