@@ -31,7 +31,7 @@ pub struct Code {
 			println!( "{}  n_local_variables: {}", indent, self.n_local_variables );
 			println!( "{}  n_shared_local_variables: {}", indent, self.n_shared_local_variables );
 			println!( "{}  opcodes: {}", indent, self.opcodes.len() );
-			for (i, c) in self.opcodes.iter().enumerate() {
+			for (i, &c) in self.opcodes.iter().enumerate() {
 				println!( "{}    {}: {:?}", indent, i, c );
 			}
 			println!( "{}  strings: {}", indent, self.strings.len() );

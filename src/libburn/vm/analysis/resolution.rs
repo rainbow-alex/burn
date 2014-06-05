@@ -6,6 +6,7 @@ use vm::analysis::annotation;
 use vm::repl;
 
 struct Scope {
+	frame: Raw<annotation::Frame>,
 	declared_variables: Vec<Raw<annotation::Variable>>,
 	used: Vec<Raw<annotation::Use>>,
 }
@@ -42,7 +43,9 @@ pub struct AnalyzeResolution {
 		}
 		
 		fn push_scope( &mut self ) {
+			let frame_ptr = Raw::new( self.get_current_frame() );
 			self.scopes.push( Scope {
+				frame: frame_ptr,
 				declared_variables: Vec::new(),
 				used: Vec::new(),
 			} );
@@ -241,7 +244,10 @@ pub struct AnalyzeResolution {
 					
 					self.analyze_expression( *while_test );
 					self.push_scope();
+					let start = self.tick();
 					self.analyze_block( while_block );
+					let end = self.tick();
+					self.repeat_variable_usages( start, end );
 					self.pop_scope();
 					
 					match *else_clause {
@@ -399,6 +405,9 @@ pub struct AnalyzeResolution {
 					frame: ref mut frame,
 					block: ref mut block,
 				} => {
+					
+					frame.get_closure().created_at = self.tick();
+					
 					self.get_current_frame().functions.push( expression_ptr );
 					
 					self.push_frame( frame );
@@ -467,7 +476,10 @@ pub struct AnalyzeResolution {
 					annotation: ref mut annotation,
 					source_offset: _,
 				} => {
-					self.write_variable( annotation.as_mut() );
+					// the variable might not have been found
+					if ! annotation.is_null() {
+						self.write_variable( annotation.as_mut() );
+					}
 				}
 				
 				node::DotAccessLvalue {..} => {}
@@ -536,5 +548,59 @@ pub struct AnalyzeResolution {
 				mutable: mutable,
 			} );
 			variable.n_binds += 1;
+		}
+		
+		fn repeat_variable_usages( &mut self, from: annotation::Time, to: annotation::Time ) {
+			
+			let current_frame = Raw::new( self.get_current_frame() );
+			
+			for scope in self.scopes.iter().rev() {
+				
+				if scope.frame != current_frame {
+					break;
+				}
+				
+				for variable in scope.declared_variables.iter() {
+					let variable = variable.as_mut();
+					
+					let is_read = variable.reads.iter()
+						.find( |r| { from < r.time && r.time < to } ).is_some();
+					
+					if is_read {
+						variable.reads.push( annotation::ReadVariable {
+							time: to,
+						} );
+					}
+					
+					let is_written = variable.writes.iter()
+						.find( |w| { from < w.time && w.time < to } ).is_some();
+					
+					if is_written {
+						variable.writes.push( annotation::WriteVariable {
+							time: to,
+						} );
+					}
+					
+					let mut is_bound = false;
+					let mut is_bound_mutable = false;
+					for bind in variable.root_binds.iter() {
+						if from < bind.time && bind.time < to {
+							is_bound = true;
+							if bind.mutable {
+								is_bound_mutable = true;
+								break;
+							}
+						}
+					}
+					
+					if is_bound {
+						variable.root_binds.push( annotation::BindVariable {
+							time: to,
+							mutable: is_bound_mutable,
+						} );
+						variable.n_binds += 1;
+					}
+				}
+			}
 		}
 	}

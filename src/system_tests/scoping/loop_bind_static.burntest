@@ -1,0 +1,23 @@
+let $a
+let $b
+
+let $i = 2
+while $i {
+	$i = $i - 1
+	
+	let $f = function() {
+		print $i
+	}
+	
+	if $a {
+		$b = $f
+	} else {
+		$a = $f
+	}
+}
+
+$a()
+$b()
+/* OUTPUTS
+0
+0
