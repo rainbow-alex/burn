@@ -1,4 +1,6 @@
 use collections::HashMap;
+use std::io::File;
+use serialize::{json, Decodable};
 use mem::raw::Raw;
 use lang::identifier::Identifier;
 use lang::value;
@@ -83,6 +85,11 @@ pub struct Module {
 		}
 	}
 
+#[deriving(Decodable)]
+pub struct MetaData {
+	sources: Vec<String>,
+}
+
 pub struct Use {
 	fqn: Vec<Identifier>,
 	inlines: Vec<(Raw<Code>, uint)>,
@@ -121,28 +128,37 @@ pub struct Use {
 				match self.step {
 				
 					FindRoot => {
-						let name = self.fqn.shift().unwrap();
+						let module_name = self.fqn.shift().unwrap();
 						
-						if vm.module_root.has_id( name ) {
+						if vm.module_root.has_id( module_name ) {
 							
-							self.loaded = vm.module_root.get_id( name );
+							self.loaded = vm.module_root.get_id( module_name );
 							self.step = ImportSubs;
 							
 						} else {
 							
-							for path in vm.import_paths.iter() {
+							for import_path in vm.import_paths.iter() {
 								
-								let mut suspect = path.clone();
-								suspect.push( format!( "{}/burnmod.json", name.get_value() ) );
+								let mut suspect = import_path.clone();
+								suspect.push( format!( "{}/burn_module.json", module_name.get_value() ) );
 								
 								if suspect.exists() {
 									
 									let module = box Module::new();
 									self.loaded = value::Module( Raw::new( module ) );
-									vm.module_root.add_module_with_id( name, module );
+									vm.module_root.add_module_with_id( module_name, module );
 									
-									// todo! read the json
-									self.root_sources.push( Path::new( "modules/example/src/example.burn" ) );
+									// todo! handle errors
+									let mut meta_file = File::open( &suspect ).unwrap();
+									let meta_data = json::from_reader( &mut meta_file ).unwrap();
+									let mut decoder = json::Decoder::new( meta_data );
+									let meta_struct: MetaData = Decodable::decode( &mut decoder ).unwrap();	
+									
+									for source in meta_struct.sources.move_iter() {
+										let mut source_path = import_path.clone();
+										source_path.push( format!( "{}/{}", module_name.get_value(), source ) );
+										self.root_sources.push( source_path );
+									}
 									
 									self.step = ImportRoot;
 									continue 'step_loop;

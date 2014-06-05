@@ -9,6 +9,7 @@
 
 extern crate core;
 extern crate collections;
+extern crate serialize;
 #[cfg(test)]
 extern crate test;
 extern crate debug;

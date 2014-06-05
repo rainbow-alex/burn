@@ -2,7 +2,7 @@
 	"description": "Dummy module for testing purposes",
 	"version": "0.0",
 	
-	"load": [
+	"sources": [
 		"src/example.burn"
 	]
 }
