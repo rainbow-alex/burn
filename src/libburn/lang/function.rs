@@ -35,7 +35,7 @@ pub struct Function {
 	impl GarbageCollected for Function {
 		
 		fn mark( &mut self ) {
-			not_implemented!();
+			unimplemented!();
 		}
 	}
 

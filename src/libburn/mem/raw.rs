@@ -1,6 +1,5 @@
 use std::mem;
 use std::ptr;
-use std::fmt;
 
 pub struct Raw<T> {
 	pub ptr: *mut T,
@@ -47,9 +46,3 @@ pub struct Raw<T> {
 	}
 	
 	impl<T> Eq for Raw<T> {}
-	
-	impl<T> fmt::Show for Raw<T> {
-		fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {
-			write!( f, "{}", self.ptr )
-		}
-	}

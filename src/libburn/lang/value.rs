@@ -44,7 +44,7 @@ pub enum Value {
 		pub fn sync_to_string( &self ) -> Result<Rc<String>,&str> {
 			match operations::to_string( self ) {
 				rust::Ok( String( s ) ) => Ok( s.clone() ),
-				_ => { not_implemented!(); },
+				_ => { unimplemented!(); },
 			}
 		}
 	}

@@ -59,22 +59,22 @@ enum FrameType {
 			match self.type_ {
 				Main( ref mut script ) => &mut *script.code,
 				Function( ref mut function ) => &mut *function.get().definition.get().code,
-				Rust(..) => impossible!(),
+				Rust(..) => unreachable!(),
 			}
 		}
 		
 		pub fn get_closure( &self ) -> &mut Function {
 			match self.type_ {
-				Main(..) => impossible!(),
+				Main(..) => unreachable!(),
 				Function( ref function ) => function.get(),
-				Rust(..) => impossible!(),
+				Rust(..) => unreachable!(),
 			}
 		}
 		
 		pub fn get_rust_operation<'l>( &'l mut self ) -> &'l mut Box<rust::Operation> {
 			match self.type_ {
 				Rust( ref mut operation ) => operation,
-				_ => { impossible!(); }
+				_ => { unreachable!(); }
 			}
 		}
 		

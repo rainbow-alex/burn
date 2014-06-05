@@ -24,7 +24,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 					flow::Running => Ok( value::Nothing ),
 					flow::Returning( v ) => Ok( v ),
 					flow::Throwing( v ) => Err( v ),
-					_ => { impossible!() },
+					_ => { unreachable!() },
 				};
 				
 				match fiber.frame.get_rust_operation().run( vm, result ) {
@@ -42,7 +42,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						fiber.push_frame( frame );
 					}
 					
-					_ => { not_implemented!(); }
+					_ => { unimplemented!(); }
 				}
 			}
 			
@@ -110,7 +110,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 									fiber.push_frame( frame );
 									continue 'frame_loop;
 								}
-								_ => { not_implemented!(); }
+								_ => { unimplemented!(); }
 							};
 						}}
 					)
@@ -122,9 +122,9 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						opcode::Print => {
 							match fiber.pop_data().to_string() {
 								rust::Ok( value::String( s ) ) => println!( "{}", s.get() ),
-								rust::Ok( _ ) => { impossible!(); }
+								rust::Ok( _ ) => { unreachable!(); }
 								rust::Throw( t ) => { throw!( t ); }
-								_ => { not_implemented!(); }
+								_ => { unimplemented!(); }
 							};
 						}
 						
@@ -200,16 +200,16 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 									continue 'frame_loop;
 								}
 								
-								_ => { not_implemented!(); }
+								_ => { unimplemented!(); }
 							}
 						}
 						
 						opcode::TypeCheckLocal { index: _ } => {
-							not_implemented!();
+							unimplemented!();
 						}
 						
 						opcode::TypeCheckSharedLocal { index: _ } => {
-							not_implemented!();
+							unimplemented!();
 						}
 						
 						opcode::Return => {
@@ -460,7 +460,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							let key = fiber.pop_data();
 							let expression = fiber.pop_data();
 							(key); (expression);
-							not_implemented!();
+							unimplemented!();
 						}
 						
 						// Operators
@@ -541,15 +541,15 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						}
 						
 						opcode::Not => {
-							not_implemented!();
+							unimplemented!();
 						}
 						
 						opcode::ShortCircuitAnd => {
-							not_implemented!();
+							unimplemented!();
 						}
 						
 						opcode::ShortCircuitOr => {
-							not_implemented!();
+							unimplemented!();
 						}
 						
 					} // match opcode
@@ -583,7 +583,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						
 						flow::PopFrame {..}
 						| flow::PopFrameAndRestoreFlow {..}
-						=> { impossible!(); }
+						=> { unreachable!(); }
 						
 						flow::PopSuppressedFlow => {
 							fiber.suppressed_flows.pop();

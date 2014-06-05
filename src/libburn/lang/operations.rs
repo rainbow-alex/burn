@@ -214,10 +214,10 @@ pub fn gt_eq( left: &Value, right: &Value ) -> rust::Result {
 
 pub fn get_property( accessed: &Value, name: Identifier ) -> rust::Result {
 	(accessed); (name);
-	not_implemented!();
+	unimplemented!();
 }
 
 pub fn set_property( accessed: &Value, name: Identifier, value: &Value ) -> rust::Result {
 	(accessed); (name); (value);
-	not_implemented!();
+	unimplemented!();
 }

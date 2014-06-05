@@ -1,7 +1,6 @@
 use mem::raw::Raw;
 use lang::identifier::Identifier;
 
-#[deriving(Show)]
 pub enum OpCode {
 	
 	// Temp

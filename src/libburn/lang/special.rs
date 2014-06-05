@@ -7,7 +7,7 @@ pub trait Special {
 	fn to_string( &self ) -> String { self.repr() }
 	fn is_truthy( &self ) -> bool { true }
 	fn is_type( &self ) -> bool { false }
-	fn type_test( &self, &value::Value ) -> bool { impossible!() }
+	fn type_test( &self, &value::Value ) -> bool { unreachable!() }
 	fn is_throwable( &self ) -> bool { false }
 }
 
@@ -43,7 +43,7 @@ pub fn create_rc_value<T:RefCountedSpecial+'static>( special: T ) -> value::Valu
 
 
 pub fn static_has_no_methods( _: Identifier ) -> bool { false }
-pub fn static_not_a_type( _: &value::Value ) -> bool { impossible!() }
+pub fn static_not_a_type( _: &value::Value ) -> bool { unreachable!() }
 
 pub struct StaticSpecialDef {
 	pub repr: &'static str,

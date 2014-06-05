@@ -405,7 +405,7 @@ struct Compilation {
 					self.fill_in_placeholder( test_opcode, jump );
 					
 					if else_clause.is_some() {
-						not_implemented!();
+						unimplemented!();
 					}
 				}
 				
