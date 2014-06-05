@@ -99,10 +99,12 @@ pub struct AnalyzeResolution {
 		}
 		
 		pub fn analyze_root( &mut self, root: &mut node::Root ) {
+			
 			self.push_frame( &mut root.frame );
 			self.push_scope();
-			self.find_declarations_in_block( &mut root.statements );
+			
 			self.analyze_block( &mut root.statements );
+			
 			self.pop_scope();
 			self.pop_frame();
 		}
@@ -117,7 +119,6 @@ pub struct AnalyzeResolution {
 				self.declare_variable( name );
 			}
 			
-			self.find_declarations_in_block( &mut root.statements );
 			self.analyze_block( &mut root.statements );
 			
 			// put any new vars into repl_state
@@ -131,39 +132,6 @@ pub struct AnalyzeResolution {
 			
 			self.pop_scope();
 			self.pop_frame();
-		}
-		
-		fn find_declarations_in_block( &mut self, block: &mut Vec<Box<node::Statement>> ) {
-			for statement in block.mut_iter() {
-				self.find_declarations_in_statement( *statement );
-			}
-		}
-		
-		fn find_declarations_in_statement( &mut self, statement: &mut node::Statement ) {
-			match *statement {
-				
-				node::Let {
-					variable_name: name,
-					annotation: ref mut annotation,
-					default: _,
-					source_offset: source_offset,
-				} => {
-					
-					let is_duplicate = self.get_current_scope().declared_variables.iter()
-						.find( |v| { v.as_mut().name == name } ).is_some();
-					
-					if is_duplicate {
-						self.errors.push( AnalysisError {
-							message: format!( "Duplicate declaration of ${}", name ),
-							source_offset: source_offset,
-						} );
-					}
-					
-					*annotation = self.declare_variable( name );
-				}
-				
-				_ => {}
-			}
 		}
 		
 		fn analyze_block( &mut self, block: &mut Vec<Box<node::Statement>> ) {
@@ -200,11 +168,24 @@ pub struct AnalyzeResolution {
 				}
 				
 				node::Let {
-					variable_name: _,
+					variable_name: name,
 					annotation: ref mut annotation,
 					default: ref mut default,
-					source_offset: _,
+					source_offset: source_offset,
 				} => {
+					
+					let is_duplicate = self.get_current_scope().declared_variables.iter()
+						.find( |v| { v.as_mut().name == name } ).is_some();
+					
+					if is_duplicate {
+						self.errors.push( AnalysisError {
+							message: format!( "Duplicate declaration of ${}", name ),
+							source_offset: source_offset,
+						} );
+					}
+					
+					*annotation = self.declare_variable( name );
+					
 					match *default {
 						Some( ref mut expression ) => {
 							self.analyze_expression( *expression );
@@ -232,14 +213,12 @@ pub struct AnalyzeResolution {
 					
 					self.analyze_expression( *if_test );
 					self.push_scope();
-					self.find_declarations_in_block( if_block );
 					self.analyze_block( if_block );
 					self.pop_scope();
 					
 					for else_if_clause in else_if_clauses.mut_iter() {
 						self.analyze_expression( else_if_clause.test );
 						self.push_scope();
-						self.find_declarations_in_block( &mut else_if_clause.block );
 						self.analyze_block( &mut else_if_clause.block );
 						self.pop_scope();
 					}
@@ -247,7 +226,6 @@ pub struct AnalyzeResolution {
 					match *else_clause {
 						Some( ref mut else_clause ) => {
 							self.push_scope();
-							self.find_declarations_in_block( &mut else_clause.block );
 							self.analyze_block( &mut else_clause.block );
 							self.pop_scope();
 						}
@@ -263,14 +241,12 @@ pub struct AnalyzeResolution {
 					
 					self.analyze_expression( *while_test );
 					self.push_scope();
-					self.find_declarations_in_block( while_block );
 					self.analyze_block( while_block );
 					self.pop_scope();
 					
 					match *else_clause {
 						Some( ref mut else_clause ) => {
 							self.push_scope();
-							self.find_declarations_in_block( &mut else_clause.block );
 							self.analyze_block( &mut else_clause.block );
 							self.pop_scope();
 						}
@@ -286,7 +262,6 @@ pub struct AnalyzeResolution {
 				} => {
 					
 					self.push_scope();
-					self.find_declarations_in_block( try_block );
 					self.analyze_block( try_block );
 					self.pop_scope();
 					
@@ -302,7 +277,6 @@ pub struct AnalyzeResolution {
 						self.push_scope();
 						
 						catch_clause.variable = self.declare_variable( catch_clause.variable_name );
-						self.find_declarations_in_block( &mut catch_clause.block );
 						self.analyze_block( &mut catch_clause.block );
 						
 						self.pop_scope();
@@ -311,7 +285,6 @@ pub struct AnalyzeResolution {
 					match *else_clause {
 						Some( ref mut else_clause ) => {
 							self.push_scope();
-							self.find_declarations_in_block( &mut else_clause.block );
 							self.analyze_block( &mut else_clause.block );
 							self.pop_scope();
 						}
@@ -321,7 +294,6 @@ pub struct AnalyzeResolution {
 					match *finally_clause {
 						Some( ref mut finally_clause ) => {
 							self.push_scope();
-							self.find_declarations_in_block( &mut finally_clause.block );
 							self.analyze_block( &mut finally_clause.block );
 							self.pop_scope();
 						}
@@ -450,7 +422,6 @@ pub struct AnalyzeResolution {
 					for parameter in parameters.mut_iter() {
 						parameter.variable = self.declare_variable( parameter.variable_name );
 					}
-					self.find_declarations_in_block( block );
 					self.analyze_block( block );
 					self.pop_scope();
 					self.pop_frame();

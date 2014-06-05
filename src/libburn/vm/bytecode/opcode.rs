@@ -55,6 +55,7 @@ pub enum OpCode {
 	// Variables
 	StoreLocal( uint ),
 	LoadLocal( uint ),
+	InitializeSharedLocal( uint ),
 	StoreSharedLocal( uint ),
 	LoadSharedLocal( uint ),
 	StoreStaticBound( uint ),

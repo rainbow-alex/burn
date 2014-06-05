@@ -177,9 +177,9 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 										function.borrow().definition.borrow().code.n_local_variables,
 										value::Nothing
 									);
-									let mut shared = Vec::from_fn(
+									let mut shared = Vec::from_elem(
 										function.borrow().definition.borrow().code.n_shared_local_variables,
-										|_| { Rc::new( value::Nothing ) }
+										None
 									);
 									
 									{
@@ -191,7 +191,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 													*locals.get_mut( i ) = fiber.pop_data();
 												}
 												function::SharedLocalFunctionParameterStorage( i ) => {
-													*shared.get_mut( i ).borrow() = fiber.pop_data();
+													*shared.get_mut( i ) = Some( Rc::new( fiber.pop_data() ) );
 												}
 											};
 										}
@@ -285,7 +285,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							match fiber.pop_data() {
 								value::Boolean( true ) => {
 									let throwable = fiber.replace_flow( flow::Running ).unwrap_throwable();
-									*fiber.frame.get_shared_local_variable( s_i ) = Rc::new( throwable );
+									*fiber.frame.get_shared_local_variable( s_i ) = Some( Rc::new( throwable ) );
 								}
 								_ => {
 									fiber.frame.instruction = i;
@@ -301,7 +301,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						
 						opcode::CatchSharedLocal { storage_index: s_i } => {
 							let throwable = fiber.replace_flow( flow::Running ).unwrap_throwable();
-							*fiber.frame.get_shared_local_variable( s_i ) = Rc::new( throwable );
+							*fiber.frame.get_shared_local_variable( s_i ) = Some( Rc::new( throwable ) );
 						}
 						
 						opcode::Rethrow => {
@@ -348,7 +348,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 										*function.static_bound_variables.get_mut( to ) = bound_var;
 									}
 									function::SharedLocalToSharedBoundBinding( from, to ) => {
-										let bound_var = fiber.frame.get_shared_local_variable( from ).clone();
+										let bound_var = fiber.frame.get_shared_local_variable( from ).as_mut().unwrap().clone();
 										*function.shared_bound_variables.get_mut( to ) = bound_var;
 									}
 									function::StaticBoundToStaticBoundBinding( from, to ) => {
@@ -403,12 +403,16 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							fiber.push_data( value );
 						}
 						
+						opcode::InitializeSharedLocal( i ) => {
+							*fiber.frame.get_shared_local_variable( i ) = Some( Rc::new( value::Nothing ) );
+						}
+						
 						opcode::StoreSharedLocal( i ) => {
-							*fiber.frame.get_shared_local_variable( i ).borrow() = fiber.pop_data();
+							*fiber.frame.get_shared_local_variable( i ).as_mut().unwrap().borrow() = fiber.pop_data();
 						}
 						
 						opcode::LoadSharedLocal( i ) => {
-							let value = fiber.frame.get_shared_local_variable( i ).borrow().clone();
+							let value = fiber.frame.get_shared_local_variable( i ).as_mut().unwrap().borrow().clone();
 							fiber.push_data( value );
 						}
 						

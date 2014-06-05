@@ -1,0 +1,55 @@
+let $a
+let $b
+let $c
+let $d
+
+let $i = 4
+while $i {
+	print $i
+	let $block_i = $i
+	
+	let $f = function() {
+		print "-"
+		print $i
+		print $block_i
+	}
+	
+	// todo! use a list or something
+	if $a {
+		if $b {
+			if $c {
+				$d = $f
+			} else {
+				$c = $f
+			}
+		} else {
+			$b = $f
+		}
+	} else {
+		$a = $f
+	}
+	
+	$i = $i - 1
+}
+
+$a()
+$b()
+$c()
+$d()
+/* OUTPUTS
+4
+3
+2
+1
+-
+0
+4
+-
+0
+3
+-
+0
+2
+-
+0
+1

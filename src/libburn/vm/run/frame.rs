@@ -9,7 +9,8 @@ use vm::run::rust;
 pub struct Frame {
 	type_: FrameType,
 	local_variables: Vec<Value>,
-	shared_local_variables: Vec<Rc<Value>>,
+	// optimize! someday, rust should be able to store this in one word
+	shared_local_variables: Vec<Option<Rc<Value>>>,
 	pub instruction: uint,
 }
 
@@ -21,7 +22,7 @@ enum FrameType {
 
 	impl Frame {
 		
-		pub fn new_main( script: Script, locals: Vec<Value>, shared: Vec<Rc<Value>> ) -> Frame {
+		pub fn new_main( script: Script, locals: Vec<Value>, shared: Vec<Option<Rc<Value>>> ) -> Frame {
 			Frame {
 				type_: Main( script ),
 				local_variables: locals,
@@ -30,7 +31,7 @@ enum FrameType {
 			}
 		}
 		
-		pub fn new_function( function: Gc<Function>, locals: Vec<Value>, shared: Vec<Rc<Value>> ) -> Frame {
+		pub fn new_function( function: Gc<Function>, locals: Vec<Value>, shared: Vec<Option<Rc<Value>>> ) -> Frame {
 			Frame {
 				type_: Function( function ),
 				local_variables: locals,
@@ -74,7 +75,7 @@ enum FrameType {
 			self.local_variables.get_mut( index )
 		}
 		
-		pub fn get_shared_local_variable<'l>( &'l mut self, index: uint ) -> &'l mut Rc<Value> {
+		pub fn get_shared_local_variable<'l>( &'l mut self, index: uint ) -> &'l mut Option<Rc<Value>> {
 			self.shared_local_variables.get_mut( index )
 		}
 		

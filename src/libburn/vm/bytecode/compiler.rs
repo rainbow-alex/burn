@@ -54,14 +54,8 @@ pub fn compile_script( source: &str ) -> Result<Frame,Vec<Box<Error>>> {
 	
 	let script = ::lang::script::Script { code: code };
 	
-	let locals = Vec::from_elem(
-		script.code.n_local_variables,
-		value::Nothing
-	);
-	let shared = Vec::from_fn(
-		script.code.n_shared_local_variables,
-		|_| { Rc::new( value::Nothing ) }
-	);
+	let locals = Vec::from_elem( script.code.n_local_variables, value::Nothing );
+	let shared = Vec::from_elem( script.code.n_shared_local_variables, None );
 	
 	Ok( Frame::new_main( script, locals, shared ) )
 }
@@ -107,18 +101,12 @@ pub fn compile_repl( repl_state: &mut repl::State, source: &str ) -> Result<Fram
 	
 	let script = ::lang::script::Script { code: code };
 	
-	let locals = Vec::from_elem(
-		script.code.n_local_variables,
-		value::Nothing
-	);
-	let mut shared = Vec::from_fn(
-		script.code.n_shared_local_variables,
-		|_| { Rc::new( value::Nothing ) }
-	);
+	let locals = Vec::from_elem( script.code.n_local_variables, value::Nothing );
+	let mut shared = Vec::from_elem( script.code.n_shared_local_variables, None );
 	
 	for variable in ast.root.frame.declared_variables.iter().take( repl_state.variables.len() ) {
 		let repl_var = repl_state.variables.find( &variable.name ).unwrap().clone();
-		*shared.get_mut( variable.local_storage_index ) = repl_var;
+		*shared.get_mut( variable.local_storage_index ) = Some( repl_var );
 	}
 	
 	Ok( Frame::new_main( script, locals, shared ) )
@@ -290,9 +278,23 @@ struct Compilation {
 							}
 							annotation::storage::SharedLocal => {
 								self.code.opcodes.push(
+									opcode::InitializeSharedLocal( annotation.local_storage_index )
+								);
+								self.code.opcodes.push(
 									opcode::StoreSharedLocal( annotation.local_storage_index )
 								);
 							}
+						};
+						
+					} else {
+						
+						match annotation.local_storage_type {
+							annotation::storage::SharedLocal => {
+								self.code.opcodes.push(
+									opcode::InitializeSharedLocal( annotation.local_storage_index )
+								);
+							}
+							_ => {}
 						};
 					}
 				}
