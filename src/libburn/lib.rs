@@ -20,7 +20,7 @@ macro_rules! debug (
 	( $b:stmt ) => { if unsafe { ::DEBUG } { $b } }
 )
 
-macro_rules! destructure_enum (
+macro_rules! match_enum (
 	( $e:expr to $p:pat => $b:block ) => {
 		match $e {
 			$p => $b,

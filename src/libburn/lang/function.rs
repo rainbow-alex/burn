@@ -20,8 +20,8 @@ pub struct Function {
 			definition: Rc<FunctionDefinition>
 		) -> Function {
 			
-			let n_bindings = definition.get().bindings.len();
-			let n_static = definition.get().n_static_bound_variables;
+			let n_bindings = definition.borrow().bindings.len();
+			let n_static = definition.borrow().n_static_bound_variables;
 			let n_shared = n_bindings - n_static;
 			
 			Function {

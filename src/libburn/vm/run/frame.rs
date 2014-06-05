@@ -58,15 +58,7 @@ enum FrameType {
 		pub fn get_code<'l>( &'l mut self ) -> &'l mut Code {
 			match self.type_ {
 				Main( ref mut script ) => &mut *script.code,
-				Function( ref mut function ) => &mut *function.get().definition.get().code,
-				Rust(..) => unreachable!(),
-			}
-		}
-		
-		pub fn get_closure( &self ) -> &mut Function {
-			match self.type_ {
-				Main(..) => unreachable!(),
-				Function( ref function ) => function.get(),
+				Function( ref mut function ) => &mut *function.borrow().definition.borrow().code,
 				Rust(..) => unreachable!(),
 			}
 		}
@@ -84,5 +76,17 @@ enum FrameType {
 		
 		pub fn get_shared_local_variable<'l>( &'l mut self, index: uint ) -> &'l mut Rc<Value> {
 			self.shared_local_variables.get_mut( index )
+		}
+		
+		fn get_closure<'l>( &'l self ) -> &'l mut Function {
+			match_enum!( self.type_ to Function( ref function ) => { function.borrow() } )
+		}
+		
+		pub fn get_static_bound_variable<'l>( &'l mut self, index: uint ) -> &'l mut Value {
+			self.get_closure().static_bound_variables.get_mut( index )
+		}
+		
+		pub fn get_shared_bound_variable<'l>( &'l mut self, index: uint ) -> &'l mut Rc<Value> {
+			self.get_closure().shared_bound_variables.get_mut( index )
 		}
 	}

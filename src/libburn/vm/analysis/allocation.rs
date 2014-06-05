@@ -74,7 +74,7 @@ pub struct AnalyzeAllocation {
 			}
 			
 			for function in frame.functions.mut_iter() {
-				destructure_enum!( *function.get() to node::Function {
+				match_enum!( *function.as_mut() to node::Function {
 					frame: ref mut frame,
 					..
 				} => {
@@ -198,7 +198,7 @@ pub struct AnalyzeAllocation {
 		}
 		
 		fn determine_binding_storage_index( &mut self, binding: &mut annotation::Binding ) {
-			match binding.variable.get().bound_storage_type {
+			match binding.variable.as_mut().bound_storage_type {
 				
 				annotation::storage::StaticBound => {
 					binding.storage_index = self.get_current_frame().n_static_bound_variables;

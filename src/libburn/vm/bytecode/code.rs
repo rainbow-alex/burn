@@ -39,7 +39,7 @@ pub struct Code {
 			for (i, f) in self.functions.iter().enumerate() {
 				println!( "{}    {}: \\{", indent, i );
 				indent.push_str( "    " );
-				f.get().code.dump_indented( indent );
+				f.borrow().code.dump_indented( indent );
 				let n = indent.len();
 				indent.truncate( n - 4 );
 			}

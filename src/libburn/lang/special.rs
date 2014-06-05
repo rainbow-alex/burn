@@ -24,7 +24,7 @@ pub struct RcSpecial {
 			unsafe { ::core::intrinsics::type_id::<T>() == self.type_id }
 		}
 		
-		pub fn get<'a>( &'a mut self ) -> &'a mut RefCountedSpecial {
+		pub fn borrow<'a>( &'a mut self ) -> &'a mut RefCountedSpecial {
 			// won't coerce without a tmp var, seems to be a bug
 			let tmp: &mut RefCountedSpecial = self.special;
 			tmp

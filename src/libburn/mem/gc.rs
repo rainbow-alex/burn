@@ -8,8 +8,7 @@ pub struct Gc<T> {
 
 	impl<T:GarbageCollected> Gc<T> {
 		
-		#[inline(always)]
-		pub fn get( &self ) -> &mut T {
+		pub fn borrow<'l>( &'l self ) -> &'l mut T {
 			unsafe { &mut (*self.ptr).value }
 			//&mut self.get_wrapper().value
 		}
@@ -30,7 +29,7 @@ pub struct Gc<T> {
 					
 					(*self.ptr).rc -= 1;
 					if (*self.ptr).rc == 0 {
-						self.get().die();
+						self.borrow().die();
 					}
 					
 					self.ptr = ptr::mut_null();

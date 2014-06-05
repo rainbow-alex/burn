@@ -18,8 +18,7 @@ pub struct Rc<T> {
 			Rc { ptr: ptr }
 		}
 		
-		#[inline(always)]
-		pub fn get( &self ) -> &mut T {
+		pub fn borrow<'l>( &'l self ) -> &'l mut T {
 			unsafe { &mut (*self.ptr).value }
 		}
 	}

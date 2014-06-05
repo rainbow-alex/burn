@@ -13,7 +13,7 @@ pub fn is_truthy( value: &Value ) -> bool {
 		value::Boolean( b ) => b,
 		value::Integer( i ) => i != 0,
 		value::Float( f ) => f != 0f64,
-		value::String( ref s ) => s.get().len() > 0,
+		value::String( ref s ) => s.borrow().len() > 0,
 		
 		value::Function(..)
 		| value::TypeUnion(..)
@@ -22,7 +22,7 @@ pub fn is_truthy( value: &Value ) -> bool {
 		=> true,
 		
 		value::StaticSpecial(..) => true,
-		value::RcSpecial( ref r ) => r.get().get().is_truthy(),
+		value::RcSpecial( ref r ) => r.borrow().borrow().is_truthy(),
 	}
 }
 
@@ -40,7 +40,7 @@ pub fn repr( value: &Value ) -> String {
 		value::Module(..) => "<Module>".to_string(),
 		
 		value::StaticSpecial( special ) => special.repr(),
-		value::RcSpecial( ref r ) => r.get().get().repr(),
+		value::RcSpecial( ref r ) => r.borrow().borrow().repr(),
 	}
 }
 
@@ -52,10 +52,10 @@ pub fn to_string( value: &Value ) -> rust::Result {
 		value::Boolean( false ) => rust::Ok( value::String( Rc::new( "false".into_string() ) ) ),
 		value::Integer( i ) => rust::Ok( value::String( Rc::new( format!( "{}", i ) ) ) ),
 		value::Float( f ) => rust::Ok( value::String( Rc::new( format!( "{}", f ) ) ) ),
-		value::String( ref s ) => rust::Ok( value::String( Rc::new( s.get().clone() ) ) ),
+		value::String( ref s ) => rust::Ok( value::String( s.clone() ) ),
 		
 		value::StaticSpecial( special ) => rust::Ok( value::String( Rc::new( special.repr() ) ) ),
-		value::RcSpecial( ref r ) => rust::Ok( value::String( Rc::new( r.get().get().to_string() ) ) ),
+		value::RcSpecial( ref r ) => rust::Ok( value::String( Rc::new( r.borrow().borrow().to_string() ) ) ),
 		
 		_ => { rust::Ok( value::String( Rc::new( value.repr() ) ) ) }
 	}
@@ -149,9 +149,9 @@ pub fn is( value: &Value, type_: &Value ) -> Result<bool,Value> {
 	match *type_ {
 		
 		value::TypeUnion( ref r ) => {
-			return match is( value, &r.get().left ) {
+			return match is( value, &r.borrow().left ) {
 				Ok( true ) => Ok( true ),
-				Ok( false ) => is( value, &r.get().right ),
+				Ok( false ) => is( value, &r.borrow().right ),
 				Err( e ) => Err( e ),
 			}
 		}
@@ -163,8 +163,8 @@ pub fn is( value: &Value, type_: &Value ) -> Result<bool,Value> {
 		}
 		
 		value::RcSpecial( ref r ) => {
-			if r.get().get().is_type() {
-				return Ok( r.get().get().type_test( value ) )
+			if r.borrow().borrow().is_type() {
+				return Ok( r.borrow().borrow().type_test( value ) )
 			}
 		}
 		

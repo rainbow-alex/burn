@@ -199,7 +199,7 @@ pub struct Use {
 						};
 						
 						for &(code, offset) in self.inlines.iter() {
-							*code.get().opcodes.get_mut( offset ) = opcode;
+							*code.as_mut().opcodes.get_mut( offset ) = opcode;
 						}
 						
 						return rust::Ok( value::Nothing );

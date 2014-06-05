@@ -104,7 +104,7 @@ pub fn is_type( value: &value::Value ) -> bool {
 		value::TypeUnion(..) => true,
 		value::TypeIntersection(..) => true,
 		value::StaticSpecial( special ) => special.is_type(),
-		value::RcSpecial( ref r ) => r.get().get().is_type(),
+		value::RcSpecial( ref r ) => r.borrow().borrow().is_type(),
 		_ => false,
 	}
 }
@@ -119,7 +119,7 @@ static Throwable: StaticSpecialDef = StaticSpecialDef {
 
 pub fn is_throwable( value: &value::Value ) -> bool {
 	match *value {
-		value::RcSpecial( ref r ) => r.get().get().is_throwable(),
+		value::RcSpecial( ref r ) => r.borrow().borrow().is_throwable(),
 		_ => false,
 	}
 }

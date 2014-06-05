@@ -57,7 +57,7 @@ pub struct AnalyzeResolution {
 		}
 		
 		fn get_current_frame<'l>( &'l mut self ) -> &'l mut annotation::Frame {
-			self.frames.mut_last().unwrap().get()
+			self.frames.mut_last().unwrap().as_mut()
 		}
 		
 		fn declare_variable( &mut self, name: Identifier ) -> Raw<annotation::Variable> {
@@ -76,7 +76,7 @@ pub struct AnalyzeResolution {
 			
 			for scope in self.scopes.iter().rev() {
 				for &variable in scope.declared_variables.iter() {
-					if variable.get().name == name {
+					if variable.as_mut().name == name {
 						return Ok( variable );
 					}
 				}
@@ -89,7 +89,7 @@ pub struct AnalyzeResolution {
 			
 			for scope in self.scopes.iter().rev() {
 				for &use_ in scope.used.iter() {
-					if use_.get().name == name {
+					if use_.as_mut().name == name {
 						return annotation::Use( use_ );
 					}
 				}
@@ -124,8 +124,8 @@ pub struct AnalyzeResolution {
 			{
 				let declared_variables = self.get_current_scope().declared_variables.iter();
 				let mut new_variables = declared_variables.skip( repl_state.variables.len() );
-				for var in new_variables {
-					repl_state.declare_variable( var.get().name );
+				for variable in new_variables {
+					repl_state.declare_variable( variable.as_mut().name );
 				}
 			}
 			
@@ -150,7 +150,7 @@ pub struct AnalyzeResolution {
 				} => {
 					
 					let is_duplicate = self.get_current_scope().declared_variables.iter()
-						.find( |v| { v.get().name == name } ).is_some();
+						.find( |v| { v.as_mut().name == name } ).is_some();
 					
 					if is_duplicate {
 						self.errors.push( AnalysisError {
@@ -208,7 +208,7 @@ pub struct AnalyzeResolution {
 					match *default {
 						Some( ref mut expression ) => {
 							self.analyze_expression( *expression );
-							self.write_variable( annotation.get() );
+							self.write_variable( annotation.as_mut() );
 						}
 						None => {}
 					};
@@ -354,7 +354,7 @@ pub struct AnalyzeResolution {
 					match self.find_variable( name ) {
 						Ok( variable ) => {
 							*annotation = variable;
-							self.read_variable( variable.get() );
+							self.read_variable( variable.as_mut() );
 						}
 						Err(..) => {
 							self.errors.push( AnalysisError {
@@ -496,7 +496,7 @@ pub struct AnalyzeResolution {
 					annotation: ref mut annotation,
 					source_offset: _,
 				} => {
-					self.write_variable( annotation.get() );
+					self.write_variable( annotation.as_mut() );
 				}
 				
 				node::DotAccessLvalue {..} => {}
@@ -504,7 +504,7 @@ pub struct AnalyzeResolution {
 		}
 		
 		fn read_variable( &mut self, variable: &mut annotation::Variable ) {
-			if self.get_current_frame() == variable.declared_in.get() {
+			if self.get_current_frame() == variable.declared_in.as_mut() {
 				variable.reads.push( annotation::ReadVariable { time: self.tick() } );
 			} else {
 				self.bind_variable( variable, false );
@@ -512,7 +512,7 @@ pub struct AnalyzeResolution {
 		}
 		
 		fn write_variable( &mut self, variable: &mut annotation::Variable ) {
-			if self.get_current_frame() == variable.declared_in.get() {
+			if self.get_current_frame() == variable.declared_in.as_mut() {
 				variable.writes.push( annotation::WriteVariable { time: self.tick() } );
 			} else {
 				self.bind_variable( variable, true );
@@ -524,19 +524,17 @@ pub struct AnalyzeResolution {
 			let mut time = 0;
 			
 			'frame_loop: for &frame in self.frames.iter().rev() {
+				let frame = frame.as_mut();
 				
-				if frame == variable.declared_in {
+				if frame == variable.declared_in.as_mut() {
 					break;
 				}
 				
-				let frame = frame.get();
-				let closure = frame.closure.as_mut().unwrap();
+				time = frame.get_closure().created_at;
 				
-				time = closure.created_at;
-				
-				for binding in closure.bindings.mut_iter() {
+				for binding in frame.get_closure().bindings.mut_iter() {
 					
-					if binding.variable.get() == variable {
+					if binding.variable.as_mut() == variable {
 						
 						if ! mutable {
 							return;
@@ -547,7 +545,7 @@ pub struct AnalyzeResolution {
 					}
 				}
 				
-				closure.bindings.push( annotation::Binding {
+				frame.get_closure().bindings.push( annotation::Binding {
 					variable: Raw::new( variable ),
 					mutable: mutable,
 					storage_index: 0,

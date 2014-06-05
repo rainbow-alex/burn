@@ -120,7 +120,7 @@ fn process_input( input: Input, args: Vec<String> ) {
 			let _ = writeln!( io::stderr(), "Uncaught throwable:" );
 			match t.sync_to_string() {
 				Ok( s ) => {
-					let _ = writeln!( io::stderr(), "{}", s.get() );
+					let _ = writeln!( io::stderr(), "{}", s.borrow() );
 				}
 				_ => { unimplemented!(); }
 			};
@@ -171,7 +171,7 @@ fn repl() {
 				let _ = writeln!( io::stderr(), "Uncaught throwable:" );
 				match t.sync_to_string() {
 					Ok( s ) => {
-						let _ = writeln!( io::stderr(), "{}", s.get() );
+						let _ = writeln!( io::stderr(), "{}", s.borrow() );
 					}
 					_ => { unimplemented!(); }
 				};
