@@ -25,14 +25,20 @@ pub struct RcSpecial {
 		pub fn is<T:'static>( &self ) -> bool {
 			unsafe { ::core::intrinsics::type_id::<T>() == self.type_id }
 		}
-		
-		pub fn borrow<'a>( &'a mut self ) -> &'a mut RefCountedSpecial {
-			// won't coerce without a tmp var, seems to be a bug
-			let tmp: &mut RefCountedSpecial = self.special;
-			tmp
+	}
+	
+	impl Deref<Box<RefCountedSpecial>> for RcSpecial {
+		fn deref<'l>( &'l self ) -> &'l Box<RefCountedSpecial> {
+			& self.special
 		}
 	}
-
+	
+	impl DerefMut<Box<RefCountedSpecial>> for RcSpecial {
+		fn deref_mut<'l>( &'l mut self ) -> &'l mut Box<RefCountedSpecial> {
+			&mut self.special
+		}
+	}
+	
 	impl RefCounted for RcSpecial {}
 
 pub fn create_rc_value<T:RefCountedSpecial+'static>( special: T ) -> value::Value {

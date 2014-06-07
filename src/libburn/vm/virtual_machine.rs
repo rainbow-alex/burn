@@ -164,8 +164,8 @@ pub struct VirtualMachine {
 			let mut fiber = box Fiber::new( frame );
 			fiber.on_return = Some( proc( to_string_value: Value ) {
 				match to_string_value {
-					::lang::value::String( s ) => {
-						unsafe { *result_ptr = s.borrow().to_string(); }
+					::lang::value::String( mut s ) => {
+						unsafe { *result_ptr = s.to_string(); }
 					}
 					_ => { unreachable!(); }
 				}

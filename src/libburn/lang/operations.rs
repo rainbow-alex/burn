@@ -13,7 +13,7 @@ pub fn is_truthy( value: &Value ) -> bool {
 		value::Boolean( b ) => b,
 		value::Integer( i ) => i != 0,
 		value::Float( f ) => f != 0f64,
-		value::String( ref s ) => s.borrow().len() > 0,
+		value::String( ref s ) => s.len() > 0,
 		
 		value::Function(..)
 		| value::TypeUnion(..)
@@ -22,7 +22,7 @@ pub fn is_truthy( value: &Value ) -> bool {
 		=> true,
 		
 		value::StaticSpecial(..) => true,
-		value::RcSpecial( ref r ) => r.borrow().borrow().is_truthy(),
+		value::RcSpecial( ref r ) => r.is_truthy(),
 	}
 }
 
@@ -40,7 +40,7 @@ pub fn repr( value: &Value ) -> String {
 		value::Module(..) => "<Module>".to_string(),
 		
 		value::StaticSpecial( special ) => special.repr(),
-		value::RcSpecial( ref r ) => r.borrow().borrow().repr(),
+		value::RcSpecial( ref r ) => r.repr(),
 	}
 }
 
@@ -56,7 +56,7 @@ pub fn to_string( value: &Value ) -> rust::Result {
 			value::String( ref s ) => s.clone(),
 			
 			value::StaticSpecial( special ) => Rc::new( special.repr() ),
-			value::RcSpecial( ref r ) => Rc::new( r.borrow().borrow().to_string() ),
+			value::RcSpecial( ref r ) => Rc::new( r.to_string() ),
 			
 			_ => { Rc::new( repr( value ) ) }
 		}
@@ -150,8 +150,8 @@ pub fn is( value: &Value, type_: &Value ) -> rust::Result {
 	match *type_ {
 		
 		value::TypeUnion( ref r ) => {
-			return match is( value, &r.borrow().left ) {
-				rust::Ok( value::Boolean( false ) ) => is( value, &r.borrow().right ),
+			return match is( value, &r.left ) {
+				rust::Ok( value::Boolean( false ) ) => is( value, &r.right ),
 				other_result @ _ => other_result,
 			}
 		}
@@ -163,8 +163,8 @@ pub fn is( value: &Value, type_: &Value ) -> rust::Result {
 		}
 		
 		value::RcSpecial( ref r ) => {
-			if r.borrow().borrow().is_type() {
-				return rust::Ok( value::Boolean( r.borrow().borrow().type_test( value ) ) )
+			if r.is_type() {
+				return rust::Ok( value::Boolean( r.type_test( value ) ) )
 			}
 		}
 		

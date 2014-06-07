@@ -22,7 +22,7 @@ static TypeError: StaticSpecialDef = StaticSpecialDef {
 
 fn is_type_error( value: &value::Value ) -> bool {
 	match *value {
-		value::RcSpecial( ref r ) => r.borrow().is::<TypeError>(),
+		value::RcSpecial( ref r ) => r.is::<TypeError>(),
 		_ => false,
 	}
 }
@@ -54,7 +54,7 @@ static ArgumentError: StaticSpecialDef = StaticSpecialDef {
 
 fn is_argument_error( value: &value::Value ) -> bool {
 	match *value {
-		value::RcSpecial( ref r ) => r.borrow().is::<ArgumentError>(),
+		value::RcSpecial( ref r ) => r.is::<ArgumentError>(),
 		_ => false,
 	}
 }

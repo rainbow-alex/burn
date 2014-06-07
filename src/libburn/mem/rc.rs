@@ -17,8 +17,16 @@ pub struct Rc<T> {
 			unsafe { mem::forget( rc_wrapper ); }
 			Rc { ptr: ptr }
 		}
-		
-		pub fn borrow<'l>( &'l self ) -> &'l mut T {
+	}
+	
+	impl<T> Deref<T> for Rc<T> {
+		fn deref<'l>( &'l self ) -> &'l T {
+			unsafe { & (*self.ptr).value }
+		}
+	}
+	
+	impl<T> DerefMut<T> for Rc<T> {
+		fn deref_mut<'l>( &'l mut self ) -> &'l mut T {
 			unsafe { &mut (*self.ptr).value }
 		}
 	}

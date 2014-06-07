@@ -6,11 +6,15 @@ pub struct Gc<T> {
 	ptr: *mut GcWrapper<T>,
 }
 
-	impl<T:GarbageCollected> Gc<T> {
-		
-		pub fn borrow<'l>( &'l self ) -> &'l mut T {
+	impl<T> Deref<T> for Gc<T> {
+		fn deref<'l>( &'l self ) -> &'l T {
+			unsafe { & (*self.ptr).value }
+		}
+	}
+	
+	impl<T> DerefMut<T> for Gc<T> {
+		fn deref_mut<'l>( &'l mut self ) -> &'l mut T {
 			unsafe { &mut (*self.ptr).value }
-			//&mut self.get_wrapper().value
 		}
 	}
 	
@@ -29,7 +33,7 @@ pub struct Gc<T> {
 					
 					(*self.ptr).rc -= 1;
 					if (*self.ptr).rc == 0 {
-						self.borrow().die();
+						self.die();
 					}
 					
 					self.ptr = ptr::mut_null();

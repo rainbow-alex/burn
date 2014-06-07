@@ -44,7 +44,7 @@ pub enum Frame {
 			match *self {
 				BurnScriptFrame { script: ref mut script, .. } => &mut *script.code,
 				BurnReplFrame { code: ref mut code, .. } => &mut **code,
-				BurnFunctionFrame { function: ref mut function, .. } => &mut *function.borrow().definition.borrow().code,
+				BurnFunctionFrame { function: ref mut function, .. } => &mut *function.definition.code,
 				BurnInvocationFrame { code: ref mut code, .. } => &mut **code,
 				
 				RustOperationFrame(..) => { unreachable!(); }
@@ -79,8 +79,8 @@ pub enum Frame {
 			self.get_context().shared_local_variables.get_mut( index )
 		}
 		
-		fn get_closure<'l>( &'l self ) -> &'l mut Function {
-			match_enum!( *self to BurnFunctionFrame { function: ref function, .. } => { function.borrow() } )
+		fn get_closure<'l>( &'l mut self ) -> &'l mut Function {
+			match_enum!( *self to BurnFunctionFrame { function: ref mut function, .. } => { &mut **function } )
 		}
 		
 		pub fn get_static_bound_variable<'l>( &'l mut self, index: uint ) -> &'l mut Value {
