@@ -10,10 +10,10 @@ use vm::bytecode::opcode;
 use vm::analysis::annotation;
 use vm::analysis::resolution::AnalyzeResolution;
 use vm::analysis::allocation::AnalyzeAllocation;
-use vm::run::frame::Frame;
+use vm::run::frame;
 use vm::repl;
 
-pub fn compile_script( source: &str ) -> Result<Frame,Vec<Box<Error>>> {
+pub fn compile_script( source: &str ) -> Result<frame::Frame,Vec<Box<Error>>> {
 	
 	debug!( { println!( "COMPILER: Parsing..." ); } )
 	
@@ -57,10 +57,13 @@ pub fn compile_script( source: &str ) -> Result<Frame,Vec<Box<Error>>> {
 	let locals = Vec::from_elem( script.code.n_local_variables, value::Nothing );
 	let shared = Vec::from_elem( script.code.n_shared_local_variables, None );
 	
-	Ok( Frame::new_main( script, locals, shared ) )
+	Ok( frame::BurnScriptFrame {
+		context: frame::BurnContext::new( locals, shared ),
+		script: script,
+	} )
 }
 
-pub fn compile_repl( repl_state: &mut repl::State, source: &str ) -> Result<Frame,Vec<Box<Error>>> {
+pub fn compile_repl( repl_state: &mut repl::State, source: &str ) -> Result<frame::Frame,Vec<Box<Error>>> {
 	
 	debug!( { println!( "COMPILER: Parsing..." ); } )
 	
@@ -99,17 +102,18 @@ pub fn compile_repl( repl_state: &mut repl::State, source: &str ) -> Result<Fram
 	
 	debug!( { println!( "COMPILER: Done." ); code.dump(); } )
 	
-	let script = ::lang::script::Script { code: code };
-	
-	let locals = Vec::from_elem( script.code.n_local_variables, value::Nothing );
-	let mut shared = Vec::from_elem( script.code.n_shared_local_variables, None );
+	let locals = Vec::from_elem( code.n_local_variables, value::Nothing );
+	let mut shared = Vec::from_elem( code.n_shared_local_variables, None );
 	
 	for variable in ast.root.frame.declared_variables.iter().take( repl_state.variables.len() ) {
 		let repl_var = repl_state.variables.find( &variable.name ).unwrap().clone();
 		*shared.get_mut( variable.local_storage_index ) = Some( repl_var );
 	}
 	
-	Ok( Frame::new_main( script, locals, shared ) )
+	Ok( frame::BurnReplFrame {
+		context: frame::BurnContext::new( locals, shared ),
+		code: code,
+	} )
 }
 
 struct Compilation {

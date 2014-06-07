@@ -109,7 +109,7 @@ pub struct VirtualMachine {
 			
 			use vm::bytecode::code::Code;
 			use vm::bytecode::opcode;
-			use vm::run::frame::Frame;
+			use vm::run::frame;
 			
 			let mut result = box String::new();
 			let result_ptr = &mut *result as *mut String;
@@ -122,11 +122,10 @@ pub struct VirtualMachine {
 				opcode::Return,
 			);
 			
-			let frame = Frame::new_rust_invoke(
-				code,
-				vec!( value ),
-				vec!()
-			);
+			let frame = frame::BurnInvocationFrame {
+				context: frame::BurnContext::new( vec!( value ), vec!() ),
+				code: code,
+			};
 			
 			let mut fiber = box Fiber::new( frame );
 			fiber.on_return = Some( proc( to_string_value: Value ) {

@@ -13,6 +13,38 @@ use builtin::burn::{errors, types};
 pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 	
 	'frame_loop: loop {
+	
+	macro_rules! new_frame(
+		( $frame:expr ) => {{
+			let frame = $frame;
+			
+			let is_running = match fiber.flow {
+				flow::Running => true,
+				_ => false,
+			};
+			
+			fiber.push_frame( frame );
+			
+			if is_running {
+				
+				fiber.flow_points.push(
+					flow::PopFrame { data_stack_len: fiber.data_stack.len() }
+				);
+				
+			} else {
+				
+				let suppressed = fiber.replace_flow( flow::Running );
+				fiber.suppressed_flows.push( suppressed );
+				
+				fiber.flow_points.push(
+					flow::PopFrameAndRestoreFlow { data_stack_len: fiber.data_stack.len() }
+				);
+			}
+			
+			continue 'frame_loop;
+		}}
+	)
+	
 	if fiber.frame.is_rust_operation() {
 		
 		match fiber.flow.clone() { // optimize! get rid of this clone
@@ -38,7 +70,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 					
 					rust::Burn( frame ) => {
 						fiber.flow_points.push( flow::PopFrame { data_stack_len: fiber.data_stack.len() } );
-						fiber.push_frame( frame );
+						new_frame!( frame );
 					}
 					
 					_ => { unimplemented!(); }
@@ -78,16 +110,17 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 		let opcodes = fiber.frame.get_code().opcodes.as_mut_ptr();
 		
 		'flow_loop: loop {
-		match fiber.flow.clone() { // clone because of rust#6393
+		match fiber.flow.clone() { // optimize! workaround because of rust#6393
 			
 			flow::Running | flow::Catching(..) => {
 				
 				'instruction_loop: loop {
 					
 					debug!( {
+						let instruction = fiber.frame.get_context().instruction;
 						println!(
 							"VM: running {}/{} ({})",
-							fiber.frame.instruction.clone(), // clone because of unidentified rust bug
+							instruction,
 							fiber.frame.get_code().opcodes.len(),
 							fiber.flow_points.len()
 						);
@@ -106,15 +139,14 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 								rust::Ok( result ) => { fiber.push_data( result ); }
 								rust::Throw( t ) => { throw!( t ); }
 								rust::Burn( frame ) => {
-									fiber.push_frame( frame );
-									continue 'frame_loop;
+									new_frame!( frame );
 								}
 								_ => { unimplemented!(); }
 							};
 						}}
 					)
 					
-					match unsafe { *opcodes.offset( fiber.frame.instruction as int ) } {
+					match unsafe { *opcodes.offset( fiber.frame.get_context().instruction as int ) } {
 						
 						// Temporary
 						
@@ -144,13 +176,13 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 						}
 						
 						opcode::Jump { instruction: i } => {
-							fiber.frame.instruction = i;
+							fiber.frame.get_context().instruction = i;
 							continue 'instruction_loop;
 						}
 						
 						opcode::JumpIfPopFalsy { instruction: i } => {
 							if ! operations::is_truthy( &fiber.pop_data() ) {
-								fiber.frame.instruction = i;
+								fiber.frame.get_context().instruction = i;
 								continue 'instruction_loop;
 							}
 						}
@@ -172,7 +204,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 								
 								value::Function( function ) => {
 									
-									fiber.frame.instruction += 1;
+									fiber.frame.get_context().instruction += 1;
 									
 									let mut locals = Vec::from_elem(
 										function.borrow().definition.borrow().code.n_local_variables,
@@ -198,9 +230,10 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 										}
 									}
 									
-									fiber.push_frame( frame::Frame::new_function( function, locals, shared ) );
-									
-									continue 'frame_loop;
+									new_frame!( frame::BurnFunctionFrame {
+										context: frame::BurnContext::new( locals, shared ),
+										function: function,
+									} );
 								}
 								
 								_ => { unimplemented!(); }
@@ -279,7 +312,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 									*fiber.frame.get_local_variable( s_i ) = throwable;
 								}
 								_ => {
-									fiber.frame.instruction = i;
+									fiber.frame.get_context().instruction = i;
 									continue 'instruction_loop;
 								}
 							};
@@ -292,7 +325,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 									*fiber.frame.get_shared_local_variable( s_i ) = Some( Rc::new( throwable ) );
 								}
 								_ => {
-									fiber.frame.instruction = i;
+									fiber.frame.get_context().instruction = i;
 									continue 'instruction_loop;
 								}
 							};
@@ -310,7 +343,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 						
 						opcode::Rethrow => {
 							let throwable = match fiber.flow {
-								flow::Catching( ref t ) => t.clone(), // ref+clone because of rust#6393
+								flow::Catching( ref t ) => t.clone(), // optimize! workaround because of rust#6393
 								_ => fail!(),
 							};
 							throw!( throwable );
@@ -442,12 +475,13 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 						
 						opcode::Use { operation: operation } => {
 							let operation = unsafe { operation.get_box() };
-							unsafe { *opcodes.offset( fiber.frame.instruction as int ) = opcode::Nop; }
+							unsafe { *opcodes.offset( fiber.frame.get_context().instruction as int ) = opcode::Nop; }
 							
-							fiber.frame.instruction += 1;
+							fiber.frame.get_context().instruction += 1;
 							
-							fiber.push_frame( frame::Frame::new_rust_operation( operation as Box<rust::Operation> ) );
-							continue 'frame_loop;
+							new_frame!( frame::RustOperationFrame(
+								operation as Box<rust::Operation>
+							) );
 						}
 						
 						opcode::LoadImplicit { name: name } => {
@@ -570,7 +604,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 						
 					} // match opcode
 					
-					fiber.frame.instruction += 1;
+					fiber.frame.get_context().instruction += 1;
 					
 				} // 'instruction_loop
 				
@@ -593,7 +627,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 							} );
 							fiber.flow_points.push( flow::PopSuppressedFlow );
 							fiber.set_flow( flow::Running );
-							fiber.frame.instruction = i;
+							fiber.frame.get_context().instruction = i;
 							continue 'flow_loop;
 						}
 						
@@ -624,7 +658,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 							fiber.suppressed_flows.push( flow::Returning( value ) );
 							fiber.flow_points.push( flow::PopSuppressedFlow );
 							fiber.set_flow( flow::Running );
-							fiber.frame.instruction = i;
+							fiber.frame.get_context().instruction = i;
 							continue 'flow_loop;
 						}
 						
@@ -673,7 +707,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 						
 						flow::StartCatch { instruction: i } => {
 							fiber.set_flow( flow::Catching( throwable ) );
-							fiber.frame.instruction = i;
+							fiber.frame.get_context().instruction = i;
 							continue 'frame_loop;
 						}
 						
@@ -681,7 +715,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 							fiber.suppressed_flows.push( flow::Throwing( throwable ) );
 							fiber.flow_points.push( flow::PopSuppressedFlow );
 							fiber.set_flow( flow::Running );
-							fiber.frame.instruction = i;
+							fiber.frame.get_context().instruction = i;
 							continue 'frame_loop;
 						}
 						
@@ -701,7 +735,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 			} // flow::Throwing( e )
 			
 		} // match flow
-		} // 'flow_start
+		} // 'flow_loop
 	} // if is_rust else
-	} // 'frame_start
+	} // 'frame_loop
 }
