@@ -8,16 +8,19 @@ use vm::run::rust;
 
 pub struct Frame {
 	type_: FrameType,
+	// optimize! the length of *_variables is known via the type
+	// so instead of a vec, this could be a pointer to a fixed-size buffer
 	local_variables: Vec<Value>,
-	// optimize! someday, rust should be able to store this in one word
+	// optimize! someday, rust should be able to store Option<Rc<...>> in one word
 	shared_local_variables: Vec<Option<Rc<Value>>>,
-	pub instruction: uint,
+	pub instruction: uint, // todo! move instruction to FrameType
 }
 
 enum FrameType {
 	Main( Script ),
 	Function( Gc<Function> ),
-	Rust( Box<rust::Operation> ),
+	RustOperation( Box<rust::Operation> ),
+	RustInvoke( Box<Code> ),
 }
 
 	impl Frame {
@@ -40,18 +43,27 @@ enum FrameType {
 			}
 		}
 		
-		pub fn new_rust( operation: Box<rust::Operation> ) -> Frame {
+		pub fn new_rust_operation( operation: Box<rust::Operation> ) -> Frame {
 			Frame {
-				type_: Rust( operation ),
+				type_: RustOperation( operation ),
 				local_variables: Vec::new(),
 				shared_local_variables: Vec::new(),
 				instruction: 0,
 			}
 		}
 		
-		pub fn is_rust( &self ) -> bool {
+		pub fn new_rust_invoke( code: Box<Code>, locals: Vec<Value>, shared: Vec<Option<Rc<Value>>> ) -> Frame {
+			Frame {
+				type_: RustInvoke( code ),
+				local_variables: locals,
+				shared_local_variables: shared,
+				instruction: 0,
+			}
+		}
+		
+		pub fn is_rust_operation( &self ) -> bool {
 			match self.type_ {
-				Rust(..) => true,
+				RustOperation(..) => true,
 				_ => false,
 			}
 		}
@@ -60,13 +72,14 @@ enum FrameType {
 			match self.type_ {
 				Main( ref mut script ) => &mut *script.code,
 				Function( ref mut function ) => &mut *function.borrow().definition.borrow().code,
-				Rust(..) => unreachable!(),
+				RustOperation(..) => unreachable!(),
+				RustInvoke( ref mut code ) => &mut **code,
 			}
 		}
 		
 		pub fn get_rust_operation<'l>( &'l mut self ) -> &'l mut Box<rust::Operation> {
 			match self.type_ {
-				Rust( ref mut operation ) => operation,
+				RustOperation( ref mut operation ) => operation,
 				_ => { unreachable!(); }
 			}
 		}

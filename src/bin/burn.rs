@@ -5,9 +5,8 @@ extern crate burn;
 use std::os;
 use std::io;
 use std::path::posix::Path;
-use burn::vm::Error;
-use burn::vm::VirtualMachine;
-use burn::vm::result;
+use burn::lang::Value;
+use burn::vm::{VirtualMachine, UncaughtThrowableHandler};
 use burn::repl;
 
 enum Input {
@@ -64,8 +63,7 @@ fn process_input( input: Input, args: Vec<String> ) {
 	
 	(args); // todo!
 	
-	let mut vm = VirtualMachine::new();
-	
+	// todo! move this into libburn
 	let source = match input {
 		
 		Stdin => {
@@ -102,29 +100,18 @@ fn process_input( input: Input, args: Vec<String> ) {
 		}
 	};
 	
-	let result = vm.run_script( source.as_slice() );
+	let mut vm = VirtualMachine::new();
+	vm.on_uncaught_throwable( box OsStatusUpdater as Box<UncaughtThrowableHandler> );
+	vm.on_uncaught_throwable( box ErrorPrinter as Box<UncaughtThrowableHandler> );
 	
-	match result {
-		
-		result::Done => {
+	match vm.schedule_script( source.as_slice() ) {
+		Ok( () ) => {
+			vm.run();
 		}
-		
-		result::Fail( errors ) => {
-			for error in errors.iter() {
-				let _ = writeln!( io::stderr(), "{}", error.get_message() );
-				os::set_exit_status( 2 );
+		Err( errors ) => {
+			for error in errors.move_iter() {
+				println!( "{}", error.get_message() );
 			}
-		}
-		
-		result::UncaughtThrowable( t ) => {
-			let _ = writeln!( io::stderr(), "Uncaught throwable:" );
-			match t.sync_to_string() {
-				Ok( s ) => {
-					let _ = writeln!( io::stderr(), "{}", s.borrow() );
-				}
-				_ => { unimplemented!(); }
-			};
-			os::set_exit_status( 2 );
 		}
 	}
 }
@@ -132,6 +119,7 @@ fn process_input( input: Input, args: Vec<String> ) {
 fn repl() {
 	
 	let mut vm = VirtualMachine::new();
+	vm.on_uncaught_throwable( box ErrorPrinter as Box<UncaughtThrowableHandler> );
 	let mut state = repl::State::new();
 	
 	loop {
@@ -147,6 +135,7 @@ fn repl() {
 					return;
 				}
 			};
+			
 			if line.as_slice() == "\n" {
 				break;
 			} else {
@@ -154,30 +143,32 @@ fn repl() {
 			}
 		}
 		
-		let result = vm.run_repl( &mut state, input.as_slice() );
-		
-		match result {
-			
-			result::Done => {
+		match vm.schedule_repl( &mut state, input.as_slice() ) {
+			Ok( () ) => {
+				vm.run();
 			}
-			
-			result::Fail( errors ) => {
-				for error in errors.iter() {
-					let _ = writeln!( io::stderr(), "{}", error.get_message() );
+			Err( errors ) => {
+				for error in errors.move_iter() {
+					println!( "{}", error.get_message() );
 				}
 			}
-			
-			result::UncaughtThrowable( t ) => {
-				let _ = writeln!( io::stderr(), "Uncaught throwable:" );
-				match t.sync_to_string() {
-					Ok( s ) => {
-						let _ = writeln!( io::stderr(), "{}", s.borrow() );
-					}
-					_ => { unimplemented!(); }
-				};
-			}
 		}
-		
-		println!( "" );
 	}
 }
+
+struct ErrorPrinter;
+
+	impl UncaughtThrowableHandler for ErrorPrinter {
+		fn handle_uncaught_throwable( &mut self, vm: &mut VirtualMachine, t: Value ) {
+			let _ = writeln!( io::stderr(), "Uncaught throwable:" );
+			let _ = writeln!( io::stderr(), "{}", vm.to_string( t ).ok().unwrap() ); // todo! handle err
+		}
+	}
+
+struct OsStatusUpdater;
+
+	impl UncaughtThrowableHandler for OsStatusUpdater {
+		fn handle_uncaught_throwable( &mut self, _: &mut VirtualMachine, _: Value ) {
+			os::set_exit_status( 2 );
+		}
+	}

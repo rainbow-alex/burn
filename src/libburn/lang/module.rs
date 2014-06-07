@@ -1,4 +1,4 @@
-use collections::HashMap;
+use std::collections::HashMap;
 use std::io::File;
 use serialize::{json, Decodable};
 use mem::raw::Raw;

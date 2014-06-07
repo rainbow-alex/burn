@@ -4,17 +4,16 @@ use lang::value;
 use lang::function;
 use lang::operations;
 use vm::bytecode::opcode;
-use vm::result;
 use vm::virtual_machine::VirtualMachine;
 use vm::run::fiber::Fiber;
 use vm::run::{frame, flow, rust};
 use vm::run::rust::Operation;
 use builtin::burn::{errors, types};
 
-pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
+pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 	
 	'frame_loop: loop {
-	if fiber.frame.is_rust() {
+	if fiber.frame.is_rust_operation() {
 		
 		match fiber.flow.clone() { // optimize! get rid of this clone
 			
@@ -119,12 +118,14 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						
 						// Temporary
 						
+						opcode::ToString => {
+							handle_operation_result!( operations::to_string( &fiber.pop_data() ) );
+						}
+						
 						opcode::Print => {
-							match fiber.pop_data().to_string() {
-								rust::Ok( value::String( s ) ) => println!( "{}", s.borrow() ),
-								rust::Ok( _ ) => { unreachable!(); }
-								rust::Throw( t ) => { throw!( t ); }
-								_ => { unimplemented!(); }
+							match fiber.pop_data() {
+								value::String( s ) => println!( "{}", s.borrow() ),
+								_ => { unreachable!(); }
 							};
 						}
 						
@@ -215,12 +216,14 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						}
 						
 						opcode::Return => {
+							let value = fiber.pop_data();
 							if fiber.frame_stack.len() > 0 {
-								let flow = flow::Returning( fiber.pop_data() );
+								let flow = flow::Returning( value );
 								fiber.set_flow( flow );
 								continue 'flow_loop;
 							} else {
-								return result::Done;
+								fiber.end_return( value );
+								return;
 							}
 						}
 						
@@ -229,7 +232,8 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 								fiber.set_flow( flow::Returning( value::Nothing ) );
 								continue 'flow_loop;
 							} else {
-								return result::Done;
+								fiber.end_return( value::Nothing );
+								return;
 							}
 						}
 						
@@ -250,7 +254,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							if types::is_throwable( &throwable ) {
 								throw!( throwable );
 							} else {
-								let message = format!( "{} is not Throwable.", throwable.repr() );
+								let message = format!( "{} is not Throwable.", operations::repr( &throwable ) );
 								let error = errors::create_type_error( message );
 								throw!( error );
 							}
@@ -442,7 +446,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 							
 							fiber.frame.instruction += 1;
 							
-							fiber.push_frame( frame::Frame::new_rust( operation as Box<rust::Operation> ) );
+							fiber.push_frame( frame::Frame::new_rust_operation( operation as Box<rust::Operation> ) );
 							continue 'frame_loop;
 						}
 						
@@ -653,7 +657,16 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 				loop {
 					
 					if fiber.flow_points.len() == 0 {
-						return result::UncaughtThrowable( throwable );
+						
+						let mut handlers = mem::replace( &mut vm.uncaught_throwable_handlers, Vec::new() );
+						for handler in handlers.mut_iter() {
+							handler.handle_uncaught_throwable( vm, throwable.clone() );
+						}
+						
+						let new_handlers = mem::replace( &mut vm.uncaught_throwable_handlers, handlers );
+						vm.uncaught_throwable_handlers.push_all_move( new_handlers );
+						
+						return;
 					}
 					
 					match fiber.flow_points.pop().unwrap() {

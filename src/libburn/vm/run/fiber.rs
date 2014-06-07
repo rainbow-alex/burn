@@ -10,6 +10,7 @@ pub struct Fiber {
 	pub suppressed_flows: Vec<flow::Flow>,
 	pub flow: flow::Flow,
 	pub data_stack: Vec<value::Value>,
+	pub on_return: Option<proc(value::Value)>,
 }
 
 	impl Fiber {
@@ -22,6 +23,7 @@ pub struct Fiber {
 				suppressed_flows: Vec::new(),
 				flow: flow::Running,
 				data_stack: Vec::new(),
+				on_return: None,
 			}
 		}
 		
@@ -30,7 +32,9 @@ pub struct Fiber {
 		}
 		
 		pub fn push_frame( &mut self, frame: Frame ) {
-			// refactor! move this logic into a cpu macro?
+			
+			// todo! the fiber doesn't understand this logic, move this into cpu
+			
 			let is_running = match self.flow {
 				flow::Running => true,
 				_ => false,
@@ -65,5 +69,11 @@ pub struct Fiber {
 		
 		pub fn push_data( &mut self, value: value::Value ) {
 			self.data_stack.push( value );
+		}
+		
+		pub fn end_return( self, value: value::Value ) {
+			if self.on_return.is_some() {
+				self.on_return.unwrap()( value );
+			}
 		}
 	}

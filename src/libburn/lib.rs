@@ -8,8 +8,9 @@
 #![allow(visible_private_types)]
 
 extern crate core;
-extern crate collections;
 extern crate serialize;
+extern crate libc;
+extern crate rustuv;
 #[cfg(test)]
 extern crate test;
 extern crate debug;
@@ -86,9 +87,8 @@ mod vm {
 		pub mod cpu;
 	}
 	
-	pub mod virtual_machine;
-	pub mod result;
 	pub mod error;
+	pub mod virtual_machine;
 	
 	pub mod repl;
 }

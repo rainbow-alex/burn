@@ -1,3 +1,6 @@
+use lang::value::Value;
+use vm::virtual_machine::VirtualMachine;
+
 pub trait Error {
 	fn get_message<'l>( &'l self ) -> &'l str;
 	fn get_source_offset( &self ) -> uint;
@@ -22,3 +25,7 @@ pub struct AnalysisError {
 		fn get_message<'l>( &'l self ) -> &'l str { self.message.as_slice() }
 		fn get_source_offset( &self ) -> uint { self.source_offset }
 	}
+
+pub trait UncaughtThrowableHandler {
+	fn handle_uncaught_throwable( &mut self, &mut VirtualMachine, Value );
+}
