@@ -59,7 +59,7 @@ pub struct FunctionDefinition {
 					LocalToStaticBoundBinding(..) | StaticBoundToStaticBoundBinding(..) => true,
 					_ => false,
 				}
-			} ).len();
+			} ).count();
 			
 			FunctionDefinition {
 				parameters: parameters,
