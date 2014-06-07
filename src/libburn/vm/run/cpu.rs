@@ -13,7 +13,7 @@ use builtin::burn::{errors, types};
 pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 	
 	'frame_loop: loop {
-	if fiber.frame.is_rust() {
+	if fiber.frame.is_rust_operation() {
 		
 		match fiber.flow.clone() { // optimize! get rid of this clone
 			
@@ -446,7 +446,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 							
 							fiber.frame.instruction += 1;
 							
-							fiber.push_frame( frame::Frame::new_rust( operation as Box<rust::Operation> ) );
+							fiber.push_frame( frame::Frame::new_rust_operation( operation as Box<rust::Operation> ) );
 							continue 'frame_loop;
 						}
 						

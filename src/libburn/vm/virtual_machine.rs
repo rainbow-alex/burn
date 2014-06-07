@@ -1,14 +1,11 @@
 use rustuv::uvll;
 use libc::c_void;
-use std::mem;
 use mem::gc::GarbageCollectedManager;
 use mem::raw::Raw;
 use lang::function::Function;
 use lang::module::Module;
 use lang::value::Value;
-use vm::bytecode::compiler;
 use vm::run::fiber::Fiber;
-use vm::run::cpu;
 use vm::error::{Error, UncaughtThrowableHandler};
 use vm::repl;
 
@@ -43,7 +40,17 @@ pub struct VirtualMachine {
 			self.uncaught_throwable_handlers.push( handler );
 		}
 		
+		pub fn run( &mut self ) {
+			unsafe { uvll::uv_run( self.uv_loop, uvll::RUN_ONCE ); }
+		}
+		
+		pub fn run_loop( &mut self ) {
+			unsafe { uvll::uv_run( self.uv_loop, uvll::RUN_DEFAULT ); }
+		}
+		
 		pub fn schedule( &mut self, f: proc( &mut VirtualMachine ) ) {
+			
+			use std::mem;
 			
 			let vm_ptr: *() = unsafe { mem::transmute( &*self ) };
 			let f_ptr: *() = unsafe { mem::transmute( box f ) };
@@ -71,19 +78,15 @@ pub struct VirtualMachine {
 		
 		pub fn schedule_fiber( &mut self, fiber: Box<Fiber> ) {
 			self.schedule( proc( vm ) {
+				use vm::run::cpu;
 				cpu::run( vm, fiber );
 			} );
 		}
 		
-		pub fn run( &mut self ) {
-			unsafe { uvll::uv_run( self.uv_loop, uvll::RUN_ONCE ); }
-		}
-		
-		pub fn run_loop( &mut self ) {
-			unsafe { uvll::uv_run( self.uv_loop, uvll::RUN_DEFAULT ); }
-		}
-		
 		pub fn schedule_script( &mut self, source: &str ) -> Result<(),Vec<Box<Error>>> {
+			
+			use vm::bytecode::compiler;
+			
 			let frame = try!( compiler::compile_script( source ) );
 			let fiber = box Fiber::new( frame );
 			self.schedule_fiber( fiber );
@@ -91,6 +94,9 @@ pub struct VirtualMachine {
 		}
 		
 		pub fn schedule_repl( &mut self, repl_state: &mut repl::State, source: &str ) -> Result<(),Vec<Box<Error>>> {
+			
+			use vm::bytecode::compiler;
+			
 			let frame = try!( compiler::compile_repl( repl_state, source ) );
 			let fiber = box Fiber::new( frame );
 			self.schedule_fiber( fiber );
@@ -98,30 +104,50 @@ pub struct VirtualMachine {
 		}
 		
 		pub fn to_string( &mut self, value: Value ) -> Result<String,()> {
-			Ok( "todo".to_string() )
 			
-			/* todo!
+			// todo! maybe use a separate uv_loop?
+			
+			use vm::bytecode::code::Code;
+			use vm::bytecode::opcode;
+			use vm::run::frame::Frame;
+			
 			let mut result = box String::new();
 			let result_ptr = &mut *result as *mut String;
 			
-			let source = "";
-			let frame = compiler::compile_script( source ).ok().unwrap();
+			let mut code = box Code::new();
+			code.n_local_variables = 1;
+			code.opcodes = vec!(
+				opcode::LoadLocal( 0 ),
+				opcode::ToString,
+				opcode::Return,
+			);
+			
+			let frame = Frame::new_rust_invoke(
+				code,
+				vec!( value ),
+				vec!()
+			);
+			
 			let mut fiber = box Fiber::new( frame );
 			fiber.on_return = Some( proc( to_string_value: Value ) {
 				match to_string_value {
 					::lang::value::String( s ) => {
-						
 						unsafe { *result_ptr = s.borrow().to_string(); }
 					}
 					_ => { unreachable!(); }
 				}
 			} );
-			cpu::run( self, fiber );
+			
+			self.schedule_fiber( fiber );
 			self.run();
 			
 			Ok( *result )
-			*/
 		}
 	}
 	
-	// todo! Drop and uv_loop_delete
+	#[unsafe_destructor]
+	impl Drop for VirtualMachine {
+		fn drop( &mut self ) {
+			unsafe { uvll::uv_loop_delete( self.uv_loop ); }
+		}
+	}
