@@ -5,6 +5,7 @@ pub enum OpCode {
 	
 	// Temp
 	Print,
+	ToString,
 	
 	// VM commands
 	Nop,

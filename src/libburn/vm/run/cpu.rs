@@ -4,14 +4,13 @@ use lang::value;
 use lang::function;
 use lang::operations;
 use vm::bytecode::opcode;
-use vm::result;
 use vm::virtual_machine::VirtualMachine;
 use vm::run::fiber::Fiber;
 use vm::run::{frame, flow, rust};
 use vm::run::rust::Operation;
 use builtin::burn::{errors, types};
 
-pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
+pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 	
 	'frame_loop: loop {
 	if fiber.frame.is_rust() {
@@ -119,6 +118,10 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						
 						// Temporary
 						
+						opcode::ToString => {
+							handle_operation_result!( fiber.pop_data().to_string() );
+						}
+						
 						opcode::Print => {
 							match fiber.pop_data().to_string() {
 								rust::Ok( value::String( s ) ) => println!( "{}", s.borrow() ),
@@ -215,12 +218,14 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 						}
 						
 						opcode::Return => {
+							let value = fiber.pop_data();
 							if fiber.frame_stack.len() > 0 {
-								let flow = flow::Returning( fiber.pop_data() );
+								let flow = flow::Returning( value );
 								fiber.set_flow( flow );
 								continue 'flow_loop;
 							} else {
-								return result::Done;
+								fiber.end_return( value );
+								return;
 							}
 						}
 						
@@ -229,7 +234,8 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 								fiber.set_flow( flow::Returning( value::Nothing ) );
 								continue 'flow_loop;
 							} else {
-								return result::Done;
+								fiber.end_return( value::Nothing );
+								return;
 							}
 						}
 						
@@ -653,7 +659,11 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) -> result::Result {
 				loop {
 					
 					if fiber.flow_points.len() == 0 {
-						return result::UncaughtThrowable( throwable );
+						let vm_ptr = vm as *mut VirtualMachine;
+						for handler in vm.uncaught_throwable_handlers.mut_iter() {
+							handler.handle_uncaught_throwable( unsafe { mem::transmute( vm_ptr ) }, throwable.clone() );
+						}
+						return;
 					}
 					
 					match fiber.flow_points.pop().unwrap() {

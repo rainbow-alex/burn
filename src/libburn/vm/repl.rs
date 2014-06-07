@@ -1,7 +1,7 @@
+use std::collections::HashMap;
 use mem::rc::Rc;
 use lang::value;
 use lang::identifier::Identifier;
-use collections::HashMap;
 
 pub struct State {
 	pub variables: HashMap<Identifier, Rc<value::Value>>,

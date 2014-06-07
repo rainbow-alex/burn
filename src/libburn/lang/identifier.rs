@@ -2,7 +2,7 @@ use std::hash::Hash;
 use std::hash::sip::SipState;
 use std::mem;
 use std::fmt;
-use collections::HashMap;
+use std::collections::HashMap;
 use mem::raw::Raw;
 
 static mut ALL: Raw<HashMap<String,Box<IdentifierContainer>>> = Raw { ptr: 0 as *mut _ };

@@ -40,13 +40,6 @@ pub enum Value {
 	impl Value {
 		pub fn repr( &self ) -> String { operations::repr( self ) }
 		pub fn to_string( &self ) -> rust::Result { operations::to_string( self ) }
-		
-		pub fn sync_to_string( &self ) -> Result<Rc<String>,&str> {
-			match operations::to_string( self ) {
-				rust::Ok( String( s ) ) => Ok( s.clone() ),
-				_ => { unimplemented!(); },
-			}
-		}
 	}
 	
 	impl RefCounted for Value {}
