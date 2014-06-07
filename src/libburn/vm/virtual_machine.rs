@@ -1,7 +1,6 @@
 use rustuv::uvll;
 use libc::c_void;
 use std::mem;
-
 use mem::gc::GarbageCollectedManager;
 use mem::raw::Raw;
 use lang::function::Function;
@@ -10,18 +9,15 @@ use lang::value::Value;
 use vm::bytecode::compiler;
 use vm::run::fiber::Fiber;
 use vm::run::cpu;
+use vm::error::{Error, UncaughtThrowableHandler};
 use vm::repl;
 
-pub trait UncaughtThrowableHandler {
-	fn handle_uncaught_throwable( &mut self, &mut VirtualMachine, Value );
-}
-
 pub struct VirtualMachine {
-	pub uv_loop: *c_void,
 	pub functions: GarbageCollectedManager<Function>,
 	pub import_paths: Vec<Path>,
 	pub module_root: Box<Module>,
 	pub implicit: Raw<Module>,
+	pub uv_loop: *c_void,
 	pub uncaught_throwable_handlers: Vec<Box<UncaughtThrowableHandler>>,
 }
 
@@ -34,13 +30,17 @@ pub struct VirtualMachine {
 			root.add_module( "burn", burn );
 			
 			VirtualMachine {
-				uv_loop: unsafe { uvll::loop_new() },
 				functions: GarbageCollectedManager::new(),
 				import_paths: vec!( Path::new( "modules/" ) ), // todo!
 				implicit: Raw::new( root.get_module( "burn" ).get_module( "implicit" ) ),
 				module_root: root,
+				uv_loop: unsafe { uvll::loop_new() },
 				uncaught_throwable_handlers: Vec::new(),
 			}
+		}
+		
+		pub fn on_uncaught_throwable( &mut self, handler: Box<UncaughtThrowableHandler> ) {
+			self.uncaught_throwable_handlers.push( handler );
 		}
 		
 		pub fn schedule( &mut self, f: proc( &mut VirtualMachine ) ) {
@@ -77,38 +77,24 @@ pub struct VirtualMachine {
 		
 		pub fn run( &mut self ) {
 			unsafe { uvll::uv_run( self.uv_loop, uvll::RUN_ONCE ); }
-			// todo! uv_loop_delete
 		}
 		
 		pub fn run_loop( &mut self ) {
 			unsafe { uvll::uv_run( self.uv_loop, uvll::RUN_DEFAULT ); }
-			// todo! uv_loop_delete
 		}
 		
-		pub fn run_script( &mut self, source: &str ) {
-			match compiler::compile_script( source ) {
-				Ok( frame ) => {
-					let fiber = box Fiber::new( frame );
-					cpu::run( self, fiber );
-				}
-				Err( errors ) => {
-					(errors);
-					unimplemented!();
-				}
-			}
+		pub fn schedule_script( &mut self, source: &str ) -> Result<(),Vec<Box<Error>>> {
+			let frame = try!( compiler::compile_script( source ) );
+			let fiber = box Fiber::new( frame );
+			self.schedule_fiber( fiber );
+			Ok( () )
 		}
 		
-		pub fn run_repl( &mut self, repl_state: &mut repl::State, source: &str ) {
-			match compiler::compile_repl( repl_state, source ) {
-				Ok( frame ) => {
-					let fiber = box Fiber::new( frame );
-					cpu::run( self, fiber );
-				}
-				Err( errors ) => {
-					(errors);
-					unimplemented!();
-				}
-			}
+		pub fn schedule_repl( &mut self, repl_state: &mut repl::State, source: &str ) -> Result<(),Vec<Box<Error>>> {
+			let frame = try!( compiler::compile_repl( repl_state, source ) );
+			let fiber = box Fiber::new( frame );
+			self.schedule_fiber( fiber );
+			Ok( () )
 		}
 		
 		pub fn to_string( &mut self, value: Value ) -> Result<String,()> {
@@ -136,8 +122,6 @@ pub struct VirtualMachine {
 			Ok( *result )
 			*/
 		}
-		
-		pub fn on_uncaught_throwable( &mut self, handler: Box<UncaughtThrowableHandler> ) {
-			self.uncaught_throwable_handlers.push( handler );
-		}
 	}
+	
+	// todo! Drop and uv_loop_delete

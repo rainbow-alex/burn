@@ -303,6 +303,7 @@ struct Compilation {
 					expression: ref mut expression,
 				} => {
 					self.compile_expression( *expression );
+					self.code.opcodes.push( opcode::ToString );
 					self.code.opcodes.push( opcode::Print );
 				}
 				

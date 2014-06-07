@@ -12,8 +12,8 @@ pub mod mem {
 }
 
 pub mod vm {
-	pub use vm::error::Error;
-	pub use vm::virtual_machine::{VirtualMachine, UncaughtThrowableHandler};
+	pub use vm::virtual_machine::VirtualMachine;
+	pub use vm::error::{Error, UncaughtThrowableHandler};
 }
 
 pub mod repl {

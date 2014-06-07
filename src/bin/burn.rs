@@ -1,7 +1,6 @@
 #![feature(macro_rules)]
 
 extern crate burn;
-extern crate debug;
 
 use std::os;
 use std::io;
@@ -64,6 +63,7 @@ fn process_input( input: Input, args: Vec<String> ) {
 	
 	(args); // todo!
 	
+	// todo! move this into libburn
 	let source = match input {
 		
 		Stdin => {
@@ -101,16 +101,26 @@ fn process_input( input: Input, args: Vec<String> ) {
 	};
 	
 	let mut vm = VirtualMachine::new();
+	vm.on_uncaught_throwable( box OsStatusUpdater as Box<UncaughtThrowableHandler> );
 	vm.on_uncaught_throwable( box ErrorPrinter as Box<UncaughtThrowableHandler> );
-	vm.run_script( source.as_slice() );
-	vm.run();
+	
+	match vm.schedule_script( source.as_slice() ) {
+		Ok( () ) => {
+			vm.run();
+		}
+		Err( errors ) => {
+			for error in errors.move_iter() {
+				println!( "{}", error.get_message() );
+			}
+		}
+	}
 }
 
 fn repl() {
 	
 	let mut vm = VirtualMachine::new();
+	vm.on_uncaught_throwable( box ErrorPrinter as Box<UncaughtThrowableHandler> );
 	let mut state = repl::State::new();
-	// TODO error handling
 	
 	loop {
 		
@@ -133,9 +143,16 @@ fn repl() {
 			}
 		}
 		
-		vm.on_uncaught_throwable( box ErrorPrinter as Box<UncaughtThrowableHandler> );
-		vm.run_repl( &mut state, input.as_slice() );
-		vm.run();
+		match vm.schedule_repl( &mut state, input.as_slice() ) {
+			Ok( () ) => {
+				vm.run();
+			}
+			Err( errors ) => {
+				for error in errors.move_iter() {
+					println!( "{}", error.get_message() );
+				}
+			}
+		}
 	}
 }
 
@@ -145,6 +162,13 @@ struct ErrorPrinter;
 		fn handle_uncaught_throwable( &mut self, vm: &mut VirtualMachine, t: Value ) {
 			let _ = writeln!( io::stderr(), "Uncaught throwable:" );
 			let _ = writeln!( io::stderr(), "{}", vm.to_string( t ).ok().unwrap() ); // todo! handle err
-			// todo! os::set_exit_status( 2 );
+		}
+	}
+
+struct OsStatusUpdater;
+
+	impl UncaughtThrowableHandler for OsStatusUpdater {
+		fn handle_uncaught_throwable( &mut self, _: &mut VirtualMachine, _: Value ) {
+			os::set_exit_status( 2 );
 		}
 	}

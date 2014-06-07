@@ -58,7 +58,7 @@ pub fn to_string( value: &Value ) -> rust::Result {
 			value::StaticSpecial( special ) => Rc::new( special.repr() ),
 			value::RcSpecial( ref r ) => Rc::new( r.borrow().borrow().to_string() ),
 			
-			_ => { Rc::new( value.repr() ) }
+			_ => { Rc::new( repr( value ) ) }
 		}
 	) )
 }
@@ -86,7 +86,7 @@ pub fn add( left: &Value, right: &Value ) -> rust::Result {
 	}
 	
 	return rust::Throw(
-		create_type_error( format!( "Can't add {} and {}", left.repr(), right.repr() ) )
+		create_type_error( format!( "Can't add {} and {}", repr( left ), repr( right ) ) )
 	);
 }
 
@@ -113,19 +113,19 @@ pub fn subtract( left: &Value, right: &Value ) -> rust::Result {
 	}
 	
 	return rust::Throw(
-		create_type_error( format!( "Can't subtract {} and {}", left.repr(), right.repr() ) )
+		create_type_error( format!( "Can't subtract {} and {}", repr( left ), repr( right ) ) )
 	);
 }
 
 pub fn multiply( left: &Value, right: &Value ) -> rust::Result {
 	return rust::Throw(
-		create_type_error( format!( "Can't multiply {} and {}", left.repr(), right.repr() ) )
+		create_type_error( format!( "Can't multiply {} and {}", repr( left ), repr( right ) ) )
 	);
 }
 
 pub fn divide( left: &Value, right: &Value ) -> rust::Result {
 	return rust::Throw(
-		create_type_error( format!( "Can't divide {} and {}", left.repr(), right.repr() ) )
+		create_type_error( format!( "Can't divide {} and {}", repr( left ), repr( right ) ) )
 	);
 }
 
@@ -133,13 +133,13 @@ pub fn union( left: Value, right: Value ) -> rust::Result {
 	
 	if ! burn::types::is_type( &left ) {
 		return rust::Throw(
-			create_type_error( format!( "Can't create type union: {} is not a type", left.repr() ) )
+			create_type_error( format!( "Can't create type union: {} is not a type", repr( &left ) ) )
 		);
 	}
 	
 	if ! burn::types::is_type( &right ) {
 		return rust::Throw(
-			create_type_error( format!( "Can't create type union: {} is not a type", right.repr() ) )
+			create_type_error( format!( "Can't create type union: {} is not a type", repr( &right ) ) )
 		);
 	}
 	
@@ -172,43 +172,43 @@ pub fn is( value: &Value, type_: &Value ) -> rust::Result {
 	}
 	
 	return rust::Throw(
-		create_type_error( format!( "{} is not a type", type_.repr() ) )
+		create_type_error( format!( "{} is not a type", repr( type_ ) ) )
 	);
 }
 
 pub fn eq( left: &Value, right: &Value ) -> rust::Result {
 	return rust::Throw(
-		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+		create_type_error( format!( "Can't compare {} and {}", repr( left ), repr( right ) ) )
 	); 
 }
 
 pub fn neq( left: &Value, right: &Value ) -> rust::Result {
 	return rust::Throw(
-		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+		create_type_error( format!( "Can't compare {} and {}", repr( left ), repr( right ) ) )
 	); 
 }
 
 pub fn lt( left: &Value, right: &Value ) -> rust::Result {
 	return rust::Throw(
-		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+		create_type_error( format!( "Can't compare {} and {}", repr( left ), repr( right ) ) )
 	); 
 }
 
 pub fn gt( left: &Value, right: &Value ) -> rust::Result {
 	return rust::Throw(
-		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+		create_type_error( format!( "Can't compare {} and {}", repr( left ), repr( right ) ) )
 	); 
 }
 
 pub fn lt_eq( left: &Value, right: &Value ) -> rust::Result {
 	return rust::Throw(
-		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+		create_type_error( format!( "Can't compare {} and {}", repr( left ), repr( right ) ) )
 	); 
 }
 
 pub fn gt_eq( left: &Value, right: &Value ) -> rust::Result {
 	return rust::Throw(
-		create_type_error( format!( "Can't compare {} and {}", left.repr(), right.repr() ) )
+		create_type_error( format!( "Can't compare {} and {}", repr( left ), repr( right ) ) )
 	); 
 }
 
