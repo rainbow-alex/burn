@@ -2,18 +2,19 @@
 #![crate_id="burn#0.1"]
 #![feature(macro_rules, struct_variant, globs)]
 #![allow(unnecessary_parens)]
+// WIP: #![warn(missing_doc)]
 
-// this lint is a bit bugged
-// https://github.com/mozilla/rust/pull/14413
+// Can't work around this until there is a solution for
+// http://www.reddit.com/r/rust/comments/27fvkp/q_dont_expose_field_but_allow_incrate_usage/
 #![allow(visible_private_types)]
 
 extern crate core;
 extern crate serialize;
 extern crate libc;
 extern crate rustuv;
+extern crate debug;
 #[cfg(test)]
 extern crate test;
-extern crate debug;
 
 pub use api::*;
 mod api;

@@ -9,17 +9,36 @@ use vm::run::fiber::Fiber;
 use vm::error::{Error, UncaughtThrowableHandler};
 use vm::repl;
 
+/// The burn VM manages memory, schedules events and runs code.
+///
+/// Memory is garbage-collected. Collection is *not* deterministic.
+/// Currently the VM uses refcounting, combined with a mark-and-sweep algorithm to detect cycles.
+/// Some language features (e.g. module properties not being re-assignable)
+/// allow for interesting optimizations to this simple algorithm.
+///
+/// Code is executed in light-weight threads called fibers.
+/// A fiber can suspend (`yield`) itself whenever it chooses;
+/// a suspended fiber can be scheduled, and continues executing where it yielded.
+/// Fibers are run in parallel, but never concurrently, in the rust task that calls `run`.
+/// This allows for safely shared memory, and concurrent IO without callbacks.
 pub struct VirtualMachine {
+	#[doc(hidden)]
 	pub functions: GarbageCollectedManager<Function>,
+	#[doc(hidden)]
 	pub import_paths: Vec<Path>,
+	#[doc(hidden)]
 	pub module_root: Box<Module>,
+	#[doc(hidden)]
 	pub implicit: Raw<Module>,
-	pub uv_loop: *c_void,
+	#[doc(hidden)]
+	uv_loop: *c_void,
+	#[doc(hidden)]
 	pub uncaught_throwable_handlers: Vec<Box<UncaughtThrowableHandler>>,
 }
 
 	impl VirtualMachine {
 		
+		/// Create a new virtual machine.
 		pub fn new() -> VirtualMachine {
 			
 			let mut root = box Module::new();
@@ -36,18 +55,22 @@ pub struct VirtualMachine {
 			}
 		}
 		
+		/// Register an `UncaughtThrowableHandler`.
 		pub fn on_uncaught_throwable( &mut self, handler: Box<UncaughtThrowableHandler> ) {
 			self.uncaught_throwable_handlers.push( handler );
 		}
 		
+		/// Run scheduled events until the queue is empty.
 		pub fn run( &mut self ) {
 			unsafe { uvll::uv_run( self.uv_loop, uvll::RUN_ONCE ); }
 		}
 		
+		/// Run scheduled events forever. Waits for new events whenever the queue is empty.
 		pub fn run_loop( &mut self ) {
 			unsafe { uvll::uv_run( self.uv_loop, uvll::RUN_DEFAULT ); }
 		}
 		
+		/// Schedule a rust procedure to be executed.
 		pub fn schedule( &mut self, f: proc( &mut VirtualMachine ) ) {
 			
 			use std::mem;
@@ -76,13 +99,16 @@ pub struct VirtualMachine {
 			}
 		}
 		
-		pub fn schedule_fiber( &mut self, fiber: Box<Fiber> ) {
+		fn schedule_fiber( &mut self, fiber: Box<Fiber> ) {
 			self.schedule( proc( vm ) {
 				use vm::run::cpu;
 				cpu::run( vm, fiber );
 			} );
 		}
 		
+		/// Compile a burn script and schedule it for execution.
+		///
+		/// Any compilation errors are returned immediately.
 		pub fn schedule_script( &mut self, source: &str ) -> Result<(),Vec<Box<Error>>> {
 			
 			use vm::bytecode::compiler;
@@ -93,6 +119,10 @@ pub struct VirtualMachine {
 			Ok( () )
 		}
 		
+		/// Compile some burn code and schedule it for execution.
+		/// Root-level variables will be persisted in `repl_state`.
+		///
+		/// Any compilation errors are returned immediately.
 		pub fn schedule_repl( &mut self, repl_state: &mut repl::State, source: &str ) -> Result<(),Vec<Box<Error>>> {
 			
 			use vm::bytecode::compiler;
@@ -103,9 +133,13 @@ pub struct VirtualMachine {
 			Ok( () )
 		}
 		
+		/// Convert a value into a `String` by creating and running a fiber
+		/// to run the necessary burn code.
+		/// This method blocks the current task until the conversion is complete.
+		///
+		/// * FIXME: return uncaught throwable, if any
+		/// * FIXME: use a separate uv_loop
 		pub fn to_string( &mut self, value: Value ) -> Result<String,()> {
-			
-			// todo! maybe use a separate uv_loop?
 			
 			use vm::bytecode::code::Code;
 			use vm::bytecode::opcode;
