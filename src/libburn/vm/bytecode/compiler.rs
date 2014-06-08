@@ -132,8 +132,14 @@ struct Compilation {
 			}
 		}
 		
-		fn get_current_frame<'l>( &'l mut self ) -> &'l mut annotation::Frame {
-			self.frames.last().unwrap().as_mut()
+		fn get_current_frame<'l>( &'l self ) -> Raw<annotation::Frame> {
+			*self.frames.last().unwrap()
+		}
+		
+		fn find_bound_storage_index( &self, variable: Raw<annotation::Variable> ) -> uint {
+			self.get_current_frame().get_closure()
+				.bindings.iter().find( |b| { b.variable == variable } ).unwrap()
+				.storage_index
 		}
 		
 		fn create_placeholder( &mut self ) -> Placeholder {
@@ -205,14 +211,13 @@ struct Compilation {
 						
 						node::VariableLvalue {
 							name: _,
-							annotation: ref variable,
+							annotation: variable,
 							source_offset: _,
 						} => {
-							let variable = variable.as_mut();
 							
 							self.compile_expression( *rvalue );
 							
-							if variable.declared_in.as_mut() == self.get_current_frame() {
+							if variable.declared_in == self.get_current_frame() {
 								
 								match variable.local_storage_type {
 									annotation::storage::Local => {
@@ -229,12 +234,7 @@ struct Compilation {
 								
 							} else {
 								
-								let bound_storage_index = {
-									let binding = self.get_current_frame().get_closure().bindings.iter().find( |b| {
-										b.variable.as_mut() == variable
-									} ).unwrap();
-									binding.storage_index
-								};
+								let bound_storage_index = self.find_bound_storage_index( variable );
 								
 								match variable.bound_storage_type {
 									annotation::storage::StaticBound => {
@@ -268,7 +268,6 @@ struct Compilation {
 					default: ref mut default,
 					source_offset: _,
 				} => {
-					let annotation = annotation.as_mut();
 					
 					if default.is_some() {
 						
@@ -459,7 +458,7 @@ struct Compilation {
 						for catch_clause in catch_clauses.mut_iter() {
 							
 							let has_type = catch_clause.type_.is_some();
-							let variable = catch_clause.variable.as_mut();
+							let variable = catch_clause.variable;
 							
 							if has_type {
 								self.compile_expression( *catch_clause.type_.as_mut().unwrap() );
@@ -580,13 +579,11 @@ struct Compilation {
 				
 				node::Variable {
 					name: _,
-					annotation: ref variable,
+					annotation: variable,
 					source_offset: _,
 				} => {
 					
-					let variable = variable.as_mut();
-					
-					if variable.declared_in.as_mut() == self.get_current_frame() {
+					if variable.declared_in == self.get_current_frame() {
 						
 						match variable.local_storage_type {
 							annotation::storage::Local => {
@@ -603,11 +600,7 @@ struct Compilation {
 						
 					} else {
 						
-						let bound_storage_index = {
-							let mut bindings = self.get_current_frame().get_closure().bindings.iter();
-							let binding = bindings.find( |b| { b.variable.as_mut() == variable } ).unwrap();
-							binding.storage_index
-						};
+						let bound_storage_index = self.find_bound_storage_index( variable );
 						
 						match variable.bound_storage_type {
 							annotation::storage::StaticBound => {
@@ -626,15 +619,14 @@ struct Compilation {
 				
 				node::Name {
 					identifier: identifier,
-					annotation: ref annotation,
+					annotation: annotation,
 				} => {
 					match annotation.resolution {
 						annotation::Implicit => {
 							self.code.opcodes.push( opcode::LoadImplicit { name: identifier } );
 						}
-						annotation::Use( use_annotation ) => {
-							let operation = use_annotation.as_mut().operation.as_mut();
-							operation.add_inline( Raw::new( self.code ), self.code.opcodes.len() );
+						annotation::Use( mut use_annotation ) => {
+							use_annotation.operation.add_inline( Raw::new( self.code ), self.code.opcodes.len() );
 							self.code.opcodes.push( opcode::Fail );
 						}
 					};
@@ -818,7 +810,7 @@ struct Compilation {
 					
 					let mut parameter_definitions = Vec::<function::FunctionParameterDefinition>::new();
 					for parameter in parameters.iter() {
-						let variable = parameter.variable.as_mut();
+						let variable = parameter.variable;
 						match variable.local_storage_type {
 							annotation::storage::Local => {
 								parameter_definitions.push( function::FunctionParameterDefinition {
@@ -837,10 +829,10 @@ struct Compilation {
 					
 					let mut binding_definitions = Vec::<function::FunctionBindingDefinition>::new();
 					for binding in frame.closure.as_ref().unwrap().bindings.iter() {
-						let variable = binding.variable.as_mut();
+						let variable = binding.variable;
 						
 						// local to bound
-						if variable.declared_in.as_mut() == self.get_current_frame() {
+						if variable.declared_in == self.get_current_frame() {
 							
 							match variable.bound_storage_type {
 								annotation::storage::StaticBound => {
@@ -860,19 +852,18 @@ struct Compilation {
 						// bound to bound
 						} else {
 							
-							let current_binding = self.get_current_frame().closure.as_ref().unwrap().bindings.iter()
-								.find( |b| { b.variable.as_mut() == variable } ).unwrap();
+							let current_bound_storage_index = self.find_bound_storage_index( variable );
 							
 							match variable.bound_storage_type {
 								annotation::storage::StaticBound => {
 									binding_definitions.push( function::StaticBoundToStaticBoundBinding(
-										current_binding.storage_index,
+										current_bound_storage_index,
 										binding.storage_index
 									) );
 								}
 								annotation::storage::SharedBound => {
 									binding_definitions.push( function::SharedBoundToSharedBoundBinding(
-										current_binding.storage_index,
+										current_bound_storage_index,
 										binding.storage_index
 									) );
 								}

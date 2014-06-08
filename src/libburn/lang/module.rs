@@ -128,7 +128,7 @@ pub struct Use {
 				match self.step {
 				
 					FindRoot => {
-						let module_name = self.fqn.shift().unwrap();
+						let mut module_name = self.fqn.shift().unwrap();
 						
 						if vm.module_root.has_id( module_name ) {
 							
@@ -215,8 +215,8 @@ pub struct Use {
 							_ => { unimplemented!(); }
 						};
 						
-						for &(code, offset) in self.inlines.iter() {
-							*code.as_mut().opcodes.get_mut( offset ) = opcode;
+						for &(mut code, offset) in self.inlines.mut_iter() {
+							*code.opcodes.get_mut( offset ) = opcode;
 						}
 						
 						return rust::Ok( value::Nothing );

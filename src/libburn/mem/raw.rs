@@ -15,16 +15,24 @@ pub struct Raw<T> {
 			Raw { ptr: ptr::mut_null() }
 		}
 		
-		pub fn as_mut( &self ) -> &mut T {
-			unsafe { &mut *self.ptr }
-		}
-		
 		pub unsafe fn get_box( &self ) -> Box<T> {
 			mem::transmute( self.ptr )
 		}
 		
 		pub fn is_null( &self ) -> bool {
 			self.ptr == ptr::mut_null()
+		}
+	}
+	
+	impl<T> Deref<T> for Raw<T> {
+		fn deref<'l>( &'l self ) -> &'l T {
+			unsafe { &*self.ptr }
+		}
+	}
+	
+	impl<T> DerefMut<T> for Raw<T> {
+		fn deref_mut<'l>( &'l mut self ) -> &'l mut T {
+			unsafe { &mut*self.ptr }
 		}
 	}
 	

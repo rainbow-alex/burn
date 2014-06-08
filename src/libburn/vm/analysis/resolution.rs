@@ -43,7 +43,7 @@ pub struct AnalyzeResolution {
 		}
 		
 		fn push_scope( &mut self ) {
-			let frame_ptr = Raw::new( self.get_current_frame() );
+			let frame_ptr = self.get_current_frame();
 			self.scopes.push( Scope {
 				frame: frame_ptr,
 				declared_variables: Vec::new(),
@@ -59,8 +59,8 @@ pub struct AnalyzeResolution {
 			self.scopes.mut_last().unwrap()
 		}
 		
-		fn get_current_frame<'l>( &'l mut self ) -> &'l mut annotation::Frame {
-			self.frames.mut_last().unwrap().as_mut()
+		fn get_current_frame<'l>( &'l self ) -> Raw<annotation::Frame> {
+			*self.frames.last().unwrap()
 		}
 		
 		fn declare_variable( &mut self, name: Identifier ) -> Raw<annotation::Variable> {
@@ -68,7 +68,7 @@ pub struct AnalyzeResolution {
 			let mut variable = box annotation::Variable::new( name );
 			let ptr = Raw::new( variable );
 			
-			variable.declared_in = Raw::new( self.get_current_frame() );
+			variable.declared_in = self.get_current_frame();
 			self.get_current_scope().declared_variables.push( ptr );
 			self.get_current_frame().declared_variables.push( variable );
 			
@@ -79,7 +79,7 @@ pub struct AnalyzeResolution {
 			
 			for scope in self.scopes.iter().rev() {
 				for &variable in scope.declared_variables.iter() {
-					if variable.as_mut().name == name {
+					if variable.name == name {
 						return Ok( variable );
 					}
 				}
@@ -92,7 +92,7 @@ pub struct AnalyzeResolution {
 			
 			for scope in self.scopes.iter().rev() {
 				for &use_ in scope.used.iter() {
-					if use_.as_mut().name == name {
+					if use_.name == name {
 						return annotation::Use( use_ );
 					}
 				}
@@ -129,7 +129,7 @@ pub struct AnalyzeResolution {
 				let declared_variables = self.get_current_scope().declared_variables.iter();
 				let mut new_variables = declared_variables.skip( repl_state.variables.len() );
 				for variable in new_variables {
-					repl_state.declare_variable( variable.as_mut().name );
+					repl_state.declare_variable( variable.name );
 				}
 			}
 			
@@ -178,7 +178,7 @@ pub struct AnalyzeResolution {
 				} => {
 					
 					let is_duplicate = self.get_current_scope().declared_variables.iter()
-						.find( |v| { v.as_mut().name == name } ).is_some();
+						.find( |v| { v.name == name } ).is_some();
 					
 					if is_duplicate {
 						self.errors.push( AnalysisError {
@@ -192,7 +192,7 @@ pub struct AnalyzeResolution {
 					match *default {
 						Some( ref mut expression ) => {
 							self.analyze_expression( *expression );
-							self.write_variable( annotation.as_mut() );
+							self.write_variable( *annotation );
 						}
 						None => {}
 					};
@@ -332,7 +332,7 @@ pub struct AnalyzeResolution {
 					match self.find_variable( name ) {
 						Ok( variable ) => {
 							*annotation = variable;
-							self.read_variable( variable.as_mut() );
+							self.read_variable( variable );
 						}
 						Err(..) => {
 							self.errors.push( AnalysisError {
@@ -473,12 +473,12 @@ pub struct AnalyzeResolution {
 				
 				node::VariableLvalue {
 					name: _,
-					annotation: ref mut annotation,
+					annotation: annotation,
 					source_offset: _,
 				} => {
 					// the variable might not have been found
 					if ! annotation.is_null() {
-						self.write_variable( annotation.as_mut() );
+						self.write_variable( annotation );
 					}
 				}
 				
@@ -486,30 +486,29 @@ pub struct AnalyzeResolution {
 			}
 		}
 		
-		fn read_variable( &mut self, variable: &mut annotation::Variable ) {
-			if self.get_current_frame() == variable.declared_in.as_mut() {
+		fn read_variable( &mut self, mut variable: Raw<annotation::Variable> ) {
+			if self.get_current_frame() == variable.declared_in {
 				variable.reads.push( annotation::ReadVariable { time: self.tick() } );
 			} else {
 				self.bind_variable( variable, false );
 			}
 		}
 		
-		fn write_variable( &mut self, variable: &mut annotation::Variable ) {
-			if self.get_current_frame() == variable.declared_in.as_mut() {
+		fn write_variable( &mut self, mut variable: Raw<annotation::Variable> ) {
+			if self.get_current_frame() == variable.declared_in {
 				variable.writes.push( annotation::WriteVariable { time: self.tick() } );
 			} else {
 				self.bind_variable( variable, true );
 			}
 		}
 		
-		fn bind_variable( &mut self, variable: &mut annotation::Variable, mutable: bool ) {
+		fn bind_variable( &mut self, mut variable: Raw<annotation::Variable>, mutable: bool ) {
 			
 			let mut time = 0;
 			
-			'frame_loop: for &frame in self.frames.iter().rev() {
-				let frame = frame.as_mut();
+			'frame_loop: for &mut frame in self.frames.iter().rev() {
 				
-				if frame == variable.declared_in.as_mut() {
+				if frame == variable.declared_in {
 					break;
 				}
 				
@@ -517,7 +516,7 @@ pub struct AnalyzeResolution {
 				
 				for binding in frame.get_closure().bindings.mut_iter() {
 					
-					if binding.variable.as_mut() == variable {
+					if binding.variable == variable {
 						
 						if ! mutable {
 							return;
@@ -529,7 +528,7 @@ pub struct AnalyzeResolution {
 				}
 				
 				frame.get_closure().bindings.push( annotation::Binding {
-					variable: Raw::new( variable ),
+					variable: variable,
 					mutable: mutable,
 					storage_index: 0,
 				} );
@@ -552,7 +551,7 @@ pub struct AnalyzeResolution {
 		
 		fn repeat_variable_usages( &mut self, from: annotation::Time, to: annotation::Time ) {
 			
-			let current_frame = Raw::new( self.get_current_frame() );
+			let current_frame = self.get_current_frame();
 			
 			for scope in self.scopes.iter().rev() {
 				
@@ -560,8 +559,7 @@ pub struct AnalyzeResolution {
 					break;
 				}
 				
-				for variable in scope.declared_variables.iter() {
-					let variable = variable.as_mut();
+				for &mut variable in scope.declared_variables.iter() {
 					
 					let is_read = variable.reads.iter()
 						.find( |r| { from < r.time && r.time < to } ).is_some();

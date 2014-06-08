@@ -485,7 +485,7 @@ pub fn run( vm: &mut VirtualMachine, mut fiber: Box<Fiber> ) {
 						}
 						
 						opcode::LoadImplicit { name: name } => {
-							match vm.implicit.as_mut().find_id( name ) {
+							match vm.implicit.find_id( name ) {
 								Ok( value ) => {
 									fiber.push_data( value.clone() );
 								}

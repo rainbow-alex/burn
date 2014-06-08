@@ -57,7 +57,6 @@ pub struct Rc<T> {
 
 struct RcWrapper<T> {
 	rc: uint,
-	// todo! wrap in Unsafe and put markers on this.
 	value: T,
 }
 

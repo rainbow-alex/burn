@@ -27,7 +27,7 @@ pub struct Identifier {
 					mem::forget( all );
 				}
 				
-				let container = ALL.as_mut().find_or_insert_with(
+				let container = ALL.find_or_insert_with(
 					value.into_string(),
 					|_| { box IdentifierContainer { value: value.into_string() } }
 				);
@@ -36,8 +36,8 @@ pub struct Identifier {
 			}
 		}
 		
-		pub fn get_value<'l>( &'l self ) -> &'l str {
-			self.ptr.as_mut().value.as_slice()
+		pub fn get_value<'l>( &'l mut self ) -> &'l str {
+			self.ptr.value.as_slice()
 		}
 	}
 	
@@ -55,7 +55,7 @@ pub struct Identifier {
 	
 	impl fmt::Show for Identifier {
 		fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {
-			write!( f, "{}", self.ptr.as_mut().value )
+			write!( f, "{}", self.ptr.value )
 		}
 	}
 
