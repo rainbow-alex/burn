@@ -1,46 +1,33 @@
 use std::vec::Vec;
-use vm::error::ParseError;
 use parse::token;
 use parse::lexer::Lexer;
 use parse::node;
 use parse::literal;
 use vm::analysis::annotation;
 use mem::raw::Raw;
+use mem::rc::Rc;
+use lang::origin::Origin;
 use lang::identifier::Identifier;
+use vm::error::ParseError;
 
 type ParseResult<T> = Result<T,ParseError>;
 
-pub fn parse_script<'src>( source: &'src str ) -> Result<Box<node::Script>,ParseError> {
+pub fn parse( origin: &Rc<Box<Origin>>, source_code: &str ) -> Result<node::Root,ParseError>{
 	
 	let mut parsing = Parsing {
-		lexer: Lexer::new( source ),
+		origin: origin,
+		lexer: Lexer::new( source_code ),
 		buffer: Vec::new(),
 		newline_policy: HeedNewlines,
 	};
 	
-	match parsing.parse_root() {
-		Ok( root ) => Ok( box node::Script { root: root } ),
-		Err( e ) => Err( e ),
-	}
+	parsing.parse_root()
 }
 
-pub fn parse_repl( source: &str ) -> Result<Box<node::Repl>,ParseError>{
-	
-	let mut parsing = Parsing {
-		lexer: Lexer::new( source ),
-		buffer: Vec::new(),
-		newline_policy: HeedNewlines,
-	};
-	
-	match parsing.parse_root() {
-		Ok( root ) => Ok( box node::Repl { root: root } ),
-		Err( e ) => Err( e ),
-	}
-}
-
-struct Parsing<'src> {
+struct Parsing<'o, 'src> {
+	origin: &'o Rc<Box<Origin>>,
 	lexer: Lexer<'src>,
-	buffer: Vec<token::Token<'src>>,
+	buffer: Vec<(token::Token<'src>, uint)>,
 	newline_policy: NewlinePolicy,
 }
 
@@ -59,7 +46,7 @@ struct Parsing<'src> {
 	static PRECEDENCE_BIN_LOGIC: Precedence = 10;
 	static PRECEDENCE_ANY: Precedence = 0;
 	
-	impl<'src> Parsing<'src> {
+	impl<'o, 'src> Parsing<'o, 'src> {
 		
 		//
 		// helpers
@@ -76,18 +63,20 @@ struct Parsing<'src> {
 			if self.newline_policy == HeedNewlines {
 				
 				self.fill_buffer( offset + 1 );
-				return *self.buffer.get( offset )
+				let (token, _) = *self.buffer.get( offset );
+				token
 				
 			} else {
 				
 				let mut i = 0;
 				loop {
 					self.fill_buffer( i + 1 );
-					if *self.buffer.get( i ) != token::Newline {
+					let (token, _) = *self.buffer.get( i );
+					if token != token::Newline {
 						if offset > 0 {
 							offset -= 1;
 						} else {
-							return *self.buffer.get( i );
+							return token;
 						}
 					}
 					i += 1;
@@ -103,7 +92,8 @@ struct Parsing<'src> {
 			if self.newline_policy == IgnoreNewlines {
 				loop {
 					self.fill_buffer(1);
-					if *self.buffer.get(0) == token::Newline {
+					let (token, _) = *self.buffer.get(0);
+					if token == token::Newline {
 						self.buffer.shift().unwrap();
 					} else {
 						break;
@@ -111,12 +101,20 @@ struct Parsing<'src> {
 				}
 			}
 			self.fill_buffer(1);
-			self.buffer.shift().unwrap()
+			let (token, _) = self.buffer.shift().unwrap();
+			token
 		}
 		
-		fn err( &self, message: String ) -> ParseError {
+		fn get_offset( &mut self ) -> uint {
+			self.fill_buffer(1);
+			let (_, offset) = *self.buffer.get(0);
+			offset
+		}
+		
+		fn err( &mut self, message: String ) -> ParseError {
 			ParseError {
-				source_offset: self.lexer.offset,
+				source_offset: self.get_offset(),
+				origin: self.origin.clone(),
 				message: message,
 			}
 		}
@@ -435,11 +433,10 @@ struct Parsing<'src> {
 		
 		fn parse_let_statement( &mut self ) -> ParseResult<Box<node::Statement>> {
 			
-			let source_offset = self.lexer.offset;
-			
 			let keyword = self.read();
 			assert!( keyword == token::Let );
 			
+			let variable_offset = self.get_offset();
 			let variable_name = match self.peek() {
 				token::Variable( name ) => {
 					self.read();
@@ -457,9 +454,9 @@ struct Parsing<'src> {
 			
 			Ok( box node::Let {
 				variable_name: variable_name,
+				variable_offset: variable_offset,
 				annotation: Raw::null(),
 				default: default,
-				source_offset: source_offset,
 			} )
 		}
 		
@@ -759,7 +756,7 @@ struct Parsing<'src> {
 					} )
 				}
 				token::Variable( name ) => {
-					let source_offset = self.lexer.offset;
+					let source_offset = self.get_offset();
 					self.read();
 					Ok( box node::Variable {
 						name: Identifier::find_or_create( name ),
@@ -890,7 +887,7 @@ struct Parsing<'src> {
 			Ok( parameters )
 		}
 		
-		fn to_lvalue( &self, expression: Box<node::Expression> ) -> ParseResult<Box<node::Lvalue>> {
+		fn to_lvalue( &mut self, expression: Box<node::Expression> ) -> ParseResult<Box<node::Lvalue>> {
 			match *expression {
 				
 				node::Variable {

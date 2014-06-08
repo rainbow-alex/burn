@@ -1,7 +1,9 @@
 use mem::raw::Raw;
+use mem::rc::Rc;
+use lang::origin::Origin;
 use lang::identifier::Identifier;
 use parse::node;
-use vm::error::AnalysisError;
+use vm::error::{AnalysisError, Error};
 use vm::analysis::annotation;
 use vm::repl;
 
@@ -11,17 +13,19 @@ struct Scope {
 	used: Vec<Raw<annotation::Use>>,
 }
 
-pub struct AnalyzeResolution {
+pub struct AnalyzeResolution<'o> {
+	origin: &'o Rc<Box<Origin>>,
 	frames: Vec<Raw<annotation::Frame>>,
 	scopes: Vec<Scope>,
 	time: annotation::Time,
-	pub errors: Vec<AnalysisError>,
+	pub errors: Vec<Box<Error>>,
 }
 
-	impl AnalyzeResolution {
+	impl<'o> AnalyzeResolution<'o> {
 		
-		pub fn new() -> AnalyzeResolution {
+		pub fn new<'l>( origin: &'l Rc<Box<Origin>> ) -> AnalyzeResolution<'l> {
 			AnalyzeResolution {
+				origin: origin,
 				frames: Vec::new(),
 				scopes: Vec::new(),
 				time: 0,
@@ -29,109 +33,28 @@ pub struct AnalyzeResolution {
 			}
 		}
 		
-		fn tick( &mut self ) -> annotation::Time {
-			self.time += 1;
-			self.time
-		}
-		
-		fn push_frame( &mut self, frame: &mut annotation::Frame ) {
-			self.frames.push( Raw::new( frame ) );
-		}
-		
-		fn pop_frame( &mut self ) {
-			self.frames.pop();
-		}
-		
-		fn push_scope( &mut self ) {
-			let frame_ptr = self.get_current_frame();
-			self.scopes.push( Scope {
-				frame: frame_ptr,
-				declared_variables: Vec::new(),
-				used: Vec::new(),
+		pub fn analyze_root( &mut self, root: &mut node::Root, repl_state: &mut Option<&mut repl::State> ) {
+			
+			self.push_frame( &mut root.frame );
+			self.push_scope();
+			
+			repl_state.as_ref().map( |repl_state| {
+				// put repl_state vars into the root scope
+				for &name in repl_state.variables.keys() {
+					self.declare_variable( name );
+				}
 			} );
-		}
-		
-		fn pop_scope( &mut self ) {
-			self.scopes.pop();
-		}
-		
-		fn get_current_scope<'l>( &'l mut self ) -> &'l mut Scope {
-			self.scopes.mut_last().unwrap()
-		}
-		
-		fn get_current_frame<'l>( &'l self ) -> Raw<annotation::Frame> {
-			*self.frames.last().unwrap()
-		}
-		
-		fn declare_variable( &mut self, name: Identifier ) -> Raw<annotation::Variable> {
-			
-			let mut variable = box annotation::Variable::new( name );
-			let ptr = Raw::new( variable );
-			
-			variable.declared_in = self.get_current_frame();
-			self.get_current_scope().declared_variables.push( ptr );
-			self.get_current_frame().declared_variables.push( variable );
-			
-			ptr
-		}
-		
-		fn find_variable( &mut self, name: Identifier ) -> Result<Raw<annotation::Variable>,()> {
-			
-			for scope in self.scopes.iter().rev() {
-				for &variable in scope.declared_variables.iter() {
-					if variable.name == name {
-						return Ok( variable );
-					}
-				}
-			}
-			
-			Err( () )
-		}
-		
-		fn find_name( &mut self, name: Identifier ) -> annotation::NameResolution {
-			
-			for scope in self.scopes.iter().rev() {
-				for &use_ in scope.used.iter() {
-					if use_.name == name {
-						return annotation::Use( use_ );
-					}
-				}
-			}
-			
-			annotation::Implicit
-		}
-		
-		pub fn analyze_root( &mut self, root: &mut node::Root ) {
-			
-			self.push_frame( &mut root.frame );
-			self.push_scope();
-			
-			self.analyze_block( &mut root.statements );
-			
-			self.pop_scope();
-			self.pop_frame();
-		}
-		
-		pub fn analyze_repl_root( &mut self, root: &mut node::Root, repl_state: &mut repl::State ) {
-			
-			self.push_frame( &mut root.frame );
-			self.push_scope();
-			
-			// put repl_state vars into the root scope
-			for &name in repl_state.variables.keys() {
-				self.declare_variable( name );
-			}
 			
 			self.analyze_block( &mut root.statements );
 			
 			// put any new vars into repl_state
-			{
+			repl_state.as_mut().map( |repl_state| {
 				let declared_variables = self.get_current_scope().declared_variables.iter();
 				let mut new_variables = declared_variables.skip( repl_state.variables.len() );
 				for variable in new_variables {
 					repl_state.declare_variable( variable.name );
 				}
-			}
+			} );
 			
 			self.pop_scope();
 			self.pop_frame();
@@ -171,20 +94,20 @@ pub struct AnalyzeResolution {
 				}
 				
 				node::Let {
+					variable_offset: variable_offset,
 					variable_name: name,
 					annotation: ref mut annotation,
 					default: ref mut default,
-					source_offset: source_offset,
 				} => {
 					
 					let is_duplicate = self.get_current_scope().declared_variables.iter()
 						.find( |v| { v.name == name } ).is_some();
 					
 					if is_duplicate {
-						self.errors.push( AnalysisError {
-							message: format!( "Duplicate declaration of ${}", name ),
-							source_offset: source_offset,
-						} );
+						self.error(
+							format!( "Duplicate declaration of ${}", name ),
+							variable_offset
+						);
 					}
 					
 					*annotation = self.declare_variable( name );
@@ -335,10 +258,10 @@ pub struct AnalyzeResolution {
 							self.read_variable( variable );
 						}
 						Err(..) => {
-							self.errors.push( AnalysisError {
-								message: format!( "Variable not found: ${}", name ),
-								source_offset: source_offset,
-							} );
+							self.error(
+								format!( "Variable not found: ${}", name ),
+								source_offset
+							);
 						}
 					};
 				}
@@ -451,10 +374,10 @@ pub struct AnalyzeResolution {
 							*annotation = variable;
 						}
 						Err(..) => {
-							self.errors.push( AnalysisError {
-								message: format!( "Variable not found: ${}.", name ),
-								source_offset: source_offset,
-							} );
+							self.error(
+								format!( "Variable not found: ${}.", name ),
+								source_offset
+							);
 						}
 					}
 				}
@@ -485,6 +408,91 @@ pub struct AnalyzeResolution {
 				node::DotAccessLvalue {..} => {}
 			}
 		}
+		
+		//
+		// Helpers
+		//
+		
+		fn error( &mut self, message: String, source_offset: uint ) {
+			self.errors.push( box AnalysisError {
+				message: message,
+				origin: self.origin.clone(),
+				source_offset: source_offset,
+			} as Box<Error> );
+		}
+		
+		fn tick( &mut self ) -> annotation::Time {
+			self.time += 1;
+			self.time
+		}
+		
+		fn push_frame( &mut self, frame: &mut annotation::Frame ) {
+			self.frames.push( Raw::new( frame ) );
+		}
+		
+		fn pop_frame( &mut self ) {
+			self.frames.pop();
+		}
+		
+		fn push_scope( &mut self ) {
+			let frame_ptr = self.get_current_frame();
+			self.scopes.push( Scope {
+				frame: frame_ptr,
+				declared_variables: Vec::new(),
+				used: Vec::new(),
+			} );
+		}
+		
+		fn pop_scope( &mut self ) {
+			self.scopes.pop();
+		}
+		
+		fn get_current_scope<'l>( &'l mut self ) -> &'l mut Scope {
+			self.scopes.mut_last().unwrap()
+		}
+		
+		fn get_current_frame<'l>( &'l self ) -> Raw<annotation::Frame> {
+			*self.frames.last().unwrap()
+		}
+		
+		fn declare_variable( &mut self, name: Identifier ) -> Raw<annotation::Variable> {
+			
+			let mut variable = box annotation::Variable::new( name );
+			let ptr = Raw::new( variable );
+			
+			variable.declared_in = self.get_current_frame();
+			self.get_current_scope().declared_variables.push( ptr );
+			self.get_current_frame().declared_variables.push( variable );
+			
+			ptr
+		}
+		
+		fn find_variable( &mut self, name: Identifier ) -> Result<Raw<annotation::Variable>,()> {
+			
+			for scope in self.scopes.iter().rev() {
+				for &variable in scope.declared_variables.iter() {
+					if variable.name == name {
+						return Ok( variable );
+					}
+				}
+			}
+			
+			Err( () )
+		}
+		
+		fn find_name( &mut self, name: Identifier ) -> annotation::NameResolution {
+			
+			for scope in self.scopes.iter().rev() {
+				for &use_ in scope.used.iter() {
+					if use_.name == name {
+						return annotation::Use( use_ );
+					}
+				}
+			}
+			
+			annotation::Implicit
+		}
+		
 		
 		fn read_variable( &mut self, mut variable: Raw<annotation::Variable> ) {
 			if self.get_current_frame() == variable.declared_in {

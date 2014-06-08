@@ -1,4 +1,3 @@
-use vm::error::AnalysisError;
 use parse::node;
 use vm::analysis::annotation;
 use vm::repl;
@@ -12,7 +11,6 @@ struct Frame {
 
 pub struct AnalyzeAllocation {
 	frames: Vec<Frame>,
-	pub errors: Vec<AnalysisError>,
 }
 
 	impl AnalyzeAllocation {
@@ -20,40 +18,31 @@ pub struct AnalyzeAllocation {
 		pub fn new() -> AnalyzeAllocation {
 			AnalyzeAllocation {
 				frames: Vec::new(),
-				errors: Vec::new(),
 			}
 		}
 		
-		fn push_frame( &mut self ) {
-			self.frames.push( Frame {
-				n_local_variables: 0,
-				n_shared_local_variables: 0,
-				n_static_bound_variables: 0,
-				n_shared_bound_variables: 0,
-			} );
-		}
-		
-		fn pop_frame( &mut self ) {
-			self.frames.pop();
-		}
-		
-		fn get_current_frame<'l>( &'l mut self ) -> &'l mut Frame {
-			self.frames.mut_last().unwrap()
-		}
-		
-		pub fn analyze_root( &mut self, root: &mut node::Root ) {
-			self.analyze_frame( &mut root.frame, 0 );
-		}
-		
-		pub fn analyze_repl_root(
+		pub fn analyze_root(
 			&mut self,
 			root: &mut node::Root,
-			repl_state: &mut repl::State
+			repl_state: &mut Option<&mut repl::State>
 		) {
-			self.analyze_frame( &mut root.frame, repl_state.variables.len() );
+			
+			let n_repl_vars = match *repl_state {
+				Some( ref repl_state ) => repl_state.variables.len(),
+				None => 0,
+			};
+			
+			self.analyze_frame_with_n_repl_vars(
+				&mut root.frame,
+				n_repl_vars
+			);
 		}
 		
-		fn analyze_frame(
+		fn analyze_frame( &mut self, frame: &mut annotation::Frame ) {
+			self.analyze_frame_with_n_repl_vars( frame, 0 );
+		}
+		
+		fn analyze_frame_with_n_repl_vars(
 			&mut self,
 			frame: &mut annotation::Frame,
 			n_repl_vars: uint
@@ -78,7 +67,7 @@ pub struct AnalyzeAllocation {
 					frame: ref mut frame,
 					..
 				} => {
-					self.analyze_frame( frame, 0 );
+					self.analyze_frame( frame );
 				} );
 			}
 			
@@ -210,5 +199,26 @@ pub struct AnalyzeAllocation {
 					self.get_current_frame().n_shared_bound_variables += 1;
 				}
 			}
+		}
+		
+		//
+		// Helpers
+		//
+		
+		fn push_frame( &mut self ) {
+			self.frames.push( Frame {
+				n_local_variables: 0,
+				n_shared_local_variables: 0,
+				n_static_bound_variables: 0,
+				n_shared_bound_variables: 0,
+			} );
+		}
+		
+		fn pop_frame( &mut self ) {
+			self.frames.pop();
+		}
+		
+		fn get_current_frame<'l>( &'l mut self ) -> &'l mut Frame {
+			self.frames.mut_last().unwrap()
 		}
 	}

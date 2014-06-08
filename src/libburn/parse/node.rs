@@ -3,14 +3,6 @@ use mem::raw::Raw;
 use lang::identifier::Identifier;
 use vm::analysis::annotation;
 
-pub struct Script {
-	pub root: Root,
-}
-
-pub struct Repl {
-	pub root: Root,
-}
-
 pub struct Root {
 	pub statements: Vec<Box<Statement>>,
 	pub frame: annotation::Frame,
@@ -35,10 +27,10 @@ pub enum Statement {
 	},
 	
 	Let {
+		pub variable_offset: uint,
 		pub variable_name: Identifier,
 		pub annotation: Raw<annotation::Variable>,
 		pub default: Option<Box<Expression>>,
-		pub source_offset: uint,
 	},
 	
 	Print {

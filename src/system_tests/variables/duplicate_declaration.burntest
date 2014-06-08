@@ -2,3 +2,4 @@ let $foo
 let $foo
 /* OUTPUTS
 Duplicate declaration of $foo
+in <stdin> on line 2

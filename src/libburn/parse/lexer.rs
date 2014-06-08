@@ -3,7 +3,7 @@ use parse::token;
 
 pub struct Lexer<'src> {
 	source: &'src str,
-	pub offset: uint,
+	offset: uint,
 }
 
 impl<'src> Lexer<'src> {
@@ -15,11 +15,12 @@ impl<'src> Lexer<'src> {
 		}
 	}
 	
-	pub fn read( &mut self ) -> token::Token<'src> {
+	// todo! make offset part of token
+	pub fn read( &mut self ) -> (token::Token<'src>, uint) {
 		loop {
 			match self.peek_char( self.offset ) {
 				None => {
-					return token::Eof;
+					return (token::Eof, self.offset);
 				},
 				Some( ' ' ) | Some( '\t' ) => {
 					self.offset += 1;
@@ -73,9 +74,10 @@ impl<'src> Lexer<'src> {
 					}
 				}
 				Some( _ ) => {
+					let offset = self.offset;
 					let (token, length) = self.match_token();
 					self.offset += length;
-					return token;
+					return (token, offset);
 				}
 			}
 		}

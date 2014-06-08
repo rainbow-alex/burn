@@ -2,6 +2,9 @@ use std::collections::HashMap;
 use std::io::File;
 use serialize::{json, Decodable};
 use mem::raw::Raw;
+use mem::rc::Rc;
+use lang::origin;
+use lang::origin::Origin;
 use lang::identifier::Identifier;
 use lang::value;
 use lang::value::Value;
@@ -175,8 +178,12 @@ pub struct Use {
 								self.step = ImportSubs;
 							}
 							Some( path ) => {
-								let source = ::std::io::File::open( &path ).unwrap().read_to_str().unwrap();
-								return match compiler::compile_script( source.as_slice() ) {
+								
+								let script = box origin::Script { path: path };
+								let source = ::std::io::File::open( &script.path ).unwrap().read_to_str().unwrap(); // todo! handle errors
+								let origin = script as Box<Origin>;
+								
+								return match compiler::compile( Rc::new( origin ), None, source.as_slice() ) {
 									Ok( frame ) => rust::Burn( frame ),
 									Err( errors ) => {
 										(errors);

@@ -2,6 +2,9 @@ use rustuv::uvll;
 use libc::c_void;
 use mem::gc::GarbageCollectedManager;
 use mem::raw::Raw;
+use mem::rc::Rc;
+use lang::origin;
+use lang::origin::Origin;
 use lang::function::Function;
 use lang::module::Module;
 use lang::value::Value;
@@ -106,28 +109,16 @@ pub struct VirtualMachine {
 			} );
 		}
 		
-		/// Compile a burn script and schedule it for execution.
+		/// Compile some source code and schedule it for execution.
+		/// If provided, root-level variables will be persisted in `repl_state`.
 		///
 		/// Any compilation errors are returned immediately.
-		pub fn schedule_script( &mut self, source: &str ) -> Result<(),Vec<Box<Error>>> {
+		pub fn schedule_source( &mut self, origin: Box<Origin>, repl_state: Option<&mut repl::State>, source_code: &str ) -> Result<(),Vec<Box<Error>>> {
 			
 			use vm::bytecode::compiler;
 			
-			let frame = try!( compiler::compile_script( source ) );
-			let fiber = box Fiber::new( frame );
-			self.schedule_fiber( fiber );
-			Ok( () )
-		}
-		
-		/// Compile some burn code and schedule it for execution.
-		/// Root-level variables will be persisted in `repl_state`.
-		///
-		/// Any compilation errors are returned immediately.
-		pub fn schedule_repl( &mut self, repl_state: &mut repl::State, source: &str ) -> Result<(),Vec<Box<Error>>> {
-			
-			use vm::bytecode::compiler;
-			
-			let frame = try!( compiler::compile_repl( repl_state, source ) );
+			let origin = Rc::new( origin );
+			let frame = try!( compiler::compile( origin, repl_state, source_code ) );
 			let fiber = box Fiber::new( frame );
 			self.schedule_fiber( fiber );
 			Ok( () )
@@ -156,9 +147,12 @@ pub struct VirtualMachine {
 				opcode::Return,
 			);
 			
-			let frame = frame::BurnInvocationFrame {
-				context: frame::BurnContext::new( vec!( value ), vec!() ),
+			let origin = box origin::Rust { name: "to_string".to_string() } as Box<Origin>;
+			
+			let frame = frame::BurnRootFrame {
+				origin: Rc::new( origin ),
 				code: code,
+				context: frame::BurnContext::new( vec!( value ), vec!() ),
 			};
 			
 			let mut fiber = box Fiber::new( frame );

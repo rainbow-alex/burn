@@ -45,16 +45,15 @@ mod parse {
 
 mod lang {
 	
+	pub mod origin;
 	pub mod identifier;
 	
 	pub mod module;
 	pub mod function;
 	pub mod type_;
-	pub mod script;
 	pub mod special;
 	
 	pub mod value;
-	
 	pub mod operations;
 }
 
@@ -89,13 +88,16 @@ mod vm {
 	}
 	
 	pub mod error;
-	pub mod virtual_machine;
-	
 	pub mod repl;
+	pub mod virtual_machine;
 }
 
 mod builtin {
 	pub mod burn;
+}
+
+mod util {
+	pub mod source;
 }
 
 pub static mut DEBUG: bool = false;

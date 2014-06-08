@@ -2,3 +2,4 @@ print $foo
 let $foo
 /* OUTPUTS
 Variable not found: $foo
+in <stdin> on line 1

@@ -96,7 +96,7 @@ pub enum Token<'src> {
 				Asterisk => write!( f, "`*`" ),
 				Slash => write!( f, "`/`" ),
 				Percent => write!( f, "`%`" ),
-	
+				
 				LeftAngleBracketEquals => write!( f, "`<=`" ),
 				RightAngleBracketEquals => write!( f, "`>=`" ),
 				PlusEquals => write!( f, "`+=`" ),

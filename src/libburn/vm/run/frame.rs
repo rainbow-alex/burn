@@ -1,31 +1,22 @@
 use mem::rc::Rc;
 use mem::gc::Gc;
 use lang::value::Value;
-use lang::script::Script;
+use lang::origin::Origin;
 use lang::function::Function;
 use vm::bytecode::code::Code;
 use vm::run::rust;
 
 pub enum Frame {
 	
-	BurnScriptFrame {
-		pub context: BurnContext,
-		pub script: Script,
-	},
-	
-	BurnReplFrame {
-		pub context: BurnContext,
+	BurnRootFrame {
+		pub origin: Rc<Box<Origin>>,
 		pub code: Box<Code>,
+		pub context: BurnContext,
 	},
 	
 	BurnFunctionFrame {
-		pub context: BurnContext,
 		pub function: Gc<Function>,
-	},
-	
-	BurnInvocationFrame {
 		pub context: BurnContext,
-		pub code: Box<Code>,
 	},
 	
 	RustOperationFrame( Box<rust::Operation> ),
@@ -42,10 +33,8 @@ pub enum Frame {
 		
 		pub fn get_code<'l>( &'l mut self ) -> &'l mut Code {
 			match *self {
-				BurnScriptFrame { script: ref mut script, .. } => &mut *script.code,
-				BurnReplFrame { code: ref mut code, .. } => &mut **code,
+				BurnRootFrame { code: ref mut code, .. } => &mut **code,
 				BurnFunctionFrame { function: ref mut function, .. } => &mut *function.definition.code,
-				BurnInvocationFrame { code: ref mut code, .. } => &mut **code,
 				
 				RustOperationFrame(..) => { unreachable!(); }
 			}
@@ -54,10 +43,8 @@ pub enum Frame {
 		// optimize! unsafe get for performance?
 		pub fn get_context<'l>( &'l mut self ) -> &'l mut BurnContext {
 			match *self {
-				BurnScriptFrame { context: ref mut context,.. }
-				| BurnReplFrame { context: ref mut context,.. }
+				BurnRootFrame { context: ref mut context,.. }
 				| BurnFunctionFrame { context: ref mut context, .. }
-				| BurnInvocationFrame { context: ref mut context, .. }
 				=> context,
 				
 				RustOperationFrame(..) => { unreachable!(); }

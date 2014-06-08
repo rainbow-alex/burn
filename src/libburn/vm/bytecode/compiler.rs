@@ -2,6 +2,7 @@ use std::mem;
 use mem::raw::Raw;
 use mem::rc::Rc;
 use parse::{parser, node};
+use lang::origin::Origin;
 use lang::function;
 use lang::value;
 use vm::error::Error;
@@ -13,106 +14,52 @@ use vm::analysis::allocation::AnalyzeAllocation;
 use vm::run::frame;
 use vm::repl;
 
-pub fn compile_script( source: &str ) -> Result<frame::Frame,Vec<Box<Error>>> {
+pub fn compile(
+	origin: Rc<Box<Origin>>,
+	mut repl_state: Option<&mut repl::State>,
+	source_code: &str
+) -> Result<frame::Frame,Vec<Box<Error>>> {
 	
-	debug!( { println!( "COMPILER: Parsing..." ); } )
-	
-	let mut ast = match parser::parse_script( source ) {
+	let mut ast = match parser::parse( &origin, source_code ) {
 		Ok( ast ) => ast,
 		Err( error ) => {
-			let mut errors = Vec::new();
-			errors.push( box error as Box<Error> );
-			return Err( errors );
+			return Err( vec!( box error as Box<Error> ) );
 		}
 	};
 	
-	debug!( { println!( "COMPILER: Analyzing variables..." ); } )
-	
-	let mut pass = AnalyzeResolution::new();
-	pass.analyze_root( &mut ast.root );
-	if pass.errors.len() > 0 {
-		return Err( pass.errors.move_iter().map( |e| { box e as Box<Error> } ).collect() );
-	}
-	
-	debug!( { println!( "COMPILER: Determing allocation..." ); } )
-	
-	let mut pass = AnalyzeAllocation::new();
-	pass.analyze_root( &mut ast.root );
-	if pass.errors.len() > 0 {
-		return Err( pass.errors.move_iter().map( |e| { box e as Box<Error> } ).collect() );
-	}
-	
-	debug!( { println!( "COMPILER: Compiling..." ); } )
-	
-	let code = {
-		let mut compilation = Compilation::new();
-		compilation.compile_root( &mut ast.root );
-		compilation.code
-	};
-	
-	debug!( { println!( "COMPILER: Done." ); code.dump(); } )
-	
-	let script = ::lang::script::Script { code: code };
-	
-	let locals = Vec::from_elem( script.code.n_local_variables, value::Nothing );
-	let shared = Vec::from_elem( script.code.n_shared_local_variables, None );
-	
-	Ok( frame::BurnScriptFrame {
-		context: frame::BurnContext::new( locals, shared ),
-		script: script,
-	} )
-}
-
-pub fn compile_repl( repl_state: &mut repl::State, source: &str ) -> Result<frame::Frame,Vec<Box<Error>>> {
-	
-	debug!( { println!( "COMPILER: Parsing..." ); } )
-	
-	let mut ast = match parser::parse_repl( source ) {
-		Ok( ast ) => ast,
-		Err( error ) => {
-			let mut errors = Vec::new();
-			errors.push( box error as Box<Error> );
-			return Err( errors );
+	{
+		let mut pass = AnalyzeResolution::new( &origin );
+		pass.analyze_root( &mut ast, &mut repl_state );
+		if pass.errors.len() > 0 {
+			return Err( pass.errors );
 		}
-	};
-	
-	debug!( { println!( "COMPILER: Analyzing variables..." ); } )
-	
-	let mut pass = AnalyzeResolution::new();
-	pass.analyze_repl_root( &mut ast.root, repl_state );
-	if pass.errors.len() > 0 {
-		return Err( pass.errors.move_iter().map( |e| { box e as Box<Error> } ).collect() );
 	}
-	
-	debug!( { println!( "COMPILER: Determing allocation..." ); } )
 	
 	let mut pass = AnalyzeAllocation::new();
-	pass.analyze_repl_root( &mut ast.root, repl_state );
-	if pass.errors.len() > 0 {
-		return Err( pass.errors.move_iter().map( |e| { box e as Box<Error> } ).collect() );
-	}
-	
-	debug!( { println!( "COMPILER: Compiling..." ); } )
+	pass.analyze_root( &mut ast, &mut repl_state );
 	
 	let code = {
 		let mut compilation = Compilation::new();
-		compilation.compile_root( &mut ast.root );
+		compilation.compile_root( &mut ast );
 		compilation.code
 	};
 	
-	debug!( { println!( "COMPILER: Done." ); code.dump(); } )
+	debug!( { code.dump(); } )
 	
 	let locals = Vec::from_elem( code.n_local_variables, value::Nothing );
 	let mut shared = Vec::from_elem( code.n_shared_local_variables, None );
 	
-	for variable in ast.root.frame.declared_variables.iter().take( repl_state.variables.len() ) {
-		let repl_var = repl_state.variables.find( &variable.name ).unwrap().clone();
-		*shared.get_mut( variable.local_storage_index ) = Some( repl_var );
-	}
+	repl_state.map( |repl_state| {
+		for variable in ast.frame.declared_variables.iter().take( repl_state.variables.len() ) {
+			let repl_var = repl_state.variables.find( &variable.name ).unwrap().clone();
+			*shared.get_mut( variable.local_storage_index ) = Some( repl_var );
+		}
+	} );
 	
-	Ok( frame::BurnReplFrame {
-		context: frame::BurnContext::new( locals, shared ),
+	Ok( frame::BurnRootFrame {
+		origin: origin,
 		code: code,
+		context: frame::BurnContext::new( locals, shared ),
 	} )
 }
 
@@ -263,10 +210,10 @@ struct Compilation {
 				}
 				
 				node::Let {
+					variable_offset: _,
 					variable_name: _,
 					annotation: ref annotation,
 					default: ref mut default,
-					source_offset: _,
 				} => {
 					
 					if default.is_some() {

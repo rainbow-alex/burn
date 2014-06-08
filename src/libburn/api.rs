@@ -1,4 +1,5 @@
 pub mod lang {
+	pub use lang::origin;
 	pub use lang::identifier::Identifier;
 	pub use lang::function::Function;
 	pub use lang::module::Module;
@@ -18,4 +19,8 @@ pub mod vm {
 
 pub mod repl {
 	pub use vm::repl::State;
+}
+
+pub mod util {
+	pub use util::source;
 }
