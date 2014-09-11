@@ -1,3 +1,5 @@
+**UPDATE:** Work on burn is ongoing at [rainbow-alex/burn.js](http://www.github.com/rainbow-alex/burn.js).
+
 Burn intends to be a light-weight, general-purpose programming language.
 Here are some of its properties you're likely to know from existing languages:
 
